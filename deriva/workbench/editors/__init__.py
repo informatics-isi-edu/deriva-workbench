@@ -1,4 +1,4 @@
 """Workbench editors package.
 """
 from .JSONEditor import JSONEditor, AnnotationEditor
-from .VisibleColumnsEditor import VisibleColumnsEditor
+from .VisibleSourcesEditor import VisibleSourcesEditor

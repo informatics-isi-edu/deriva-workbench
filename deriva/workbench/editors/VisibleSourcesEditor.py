@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QLabel, QVBoxLayout, QFrame, QWidget, QTableView, QC
     QCheckBox, QListWidget, QHeaderView, QDialogButtonBox
 from PyQt5.QtCore import QAbstractTableModel, QVariant, Qt, pyqtSlot
 
-from deriva.core import tag, ermrest_model as _erm
+from deriva.core import tag as _tag, ermrest_model as _erm
 
 
 def _constraint_name(constraint):
@@ -14,15 +14,20 @@ def _constraint_name(constraint):
     return [constraint.constraint_schema.name if constraint.constraint_schema else '', constraint.constraint_name]
 
 
-class VisibleColumnsEditor(QWidget):
-    """Visible columns annotation editor."""
+class VisibleSourcesEditor(QWidget):
+    """Visible sources (column or foreign key) annotation editor.
+    """
 
-    def __init__(self, data):
-        super(VisibleColumnsEditor, self).__init__()
-        assert data and isinstance(data, dict) and 'parent' in data
-        self.table = data['parent']
-        assert isinstance(self.table, _erm.Table)
-        self.body = self.table.annotations[tag.visible_columns]
+    table: _erm.Table
+    tag: str
+
+    def __init__(self, table, tag):
+        """Initialize visible sources editor.
+        """
+        super(VisibleSourcesEditor, self).__init__()
+        assert isinstance(table, _erm.Table)
+        self.table, self.tag = table, tag
+        self.body = self.table.annotations[tag]
 
         # create tabs for each context
         self.tabs = QTabWidget()
@@ -31,7 +36,7 @@ class VisibleColumnsEditor(QWidget):
                 contents = self.body[context].get('and', [])
             else:
                 contents = self.body[context]
-            tab = VisibleColumnsContextEditor(self.table, context, contents, self.on_remove_context)
+            tab = VisibleSourcesContextEditor(self.table, self.tag, context, contents, self.on_remove_context)
             self.tabs.addTab(tab, context)
 
         # tab for creating a new context
@@ -83,16 +88,17 @@ class VisibleColumnsEditor(QWidget):
         else:
             self.body[context] = []
             contents = self.body[context]
-        tab = VisibleColumnsContextEditor(self.table, context, contents, self.on_remove_context)
+        tab = VisibleSourcesContextEditor(self.table, self.tag, context, contents, self.on_remove_context)
         self.tabs.insertTab(len(self.tabs)-1, tab, context)
 
 
-class VisibleColumnsContextEditor(QWidget):
-    """Editor for the visible columns context."""
+class VisibleSourcesContextEditor(QWidget):
+    """Editor for the visible sources context.
+    """
 
     @staticmethod
     def _entry2row(entry):
-        """Converts a visible columns entry into a tuple for use in the table model."""
+        """Converts a visible sources entry into a tuple for use in the table model."""
 
         if isinstance(entry, str):
             return (
@@ -119,10 +125,10 @@ class VisibleColumnsContextEditor(QWidget):
         """Internal table model for a context."""
 
         def __init__(self, body):
-            super(VisibleColumnsContextEditor.TableModel, self).__init__()
+            super(VisibleSourcesContextEditor.TableModel, self).__init__()
             self.headers = ["Type", "Source", "Additional Details"]
             self.rows = [
-                VisibleColumnsContextEditor._entry2row(entry) for entry in body
+                VisibleSourcesContextEditor._entry2row(entry) for entry in body
             ]
 
         def rowCount(self, parent):
@@ -141,13 +147,26 @@ class VisibleColumnsContextEditor(QWidget):
                 return QVariant()
             return self.headers[section]
 
-    def __init__(self, table, context, body, on_remove_context):
-        """Initialize the VisibleColumnsContextEditor."""
-        super(VisibleColumnsContextEditor, self).__init__()
+    table: _erm.Table
+    context: str
+    body: dict
+
+    def __init__(self, table, tag, context, body, on_remove_context):
+        """Initialize the VisibleSourcesContextEditor.
+        """
+        super(VisibleSourcesContextEditor, self).__init__()
         self.table, self.context, self.body, self.on_remove_context = table, context, body, on_remove_context
 
+        # add/edit mode
+        if tag == _tag.visible_columns:
+            self.mode = VisibleSourceDialog.VisibleColumns
+            if self.context == 'entry':
+                self.mode &= ~VisibleSourceDialog.AllowPseudoColumn
+        else:
+            self.mode = VisibleSourceDialog.VisibleForeignKeys
+
         # table view
-        self.model = model = VisibleColumnsContextEditor.TableModel(body)
+        self.model = model = VisibleSourcesContextEditor.TableModel(body)
         self.tableView = tableView = QTableView()
         tableView.setModel(model)
         tableView.setWordWrap(True)
@@ -156,17 +175,17 @@ class VisibleColumnsContextEditor(QWidget):
         controls = QFrame()
         hlayout = QHBoxLayout()
         # ...add column button
-        addColumn = QPushButton('+', parent=controls)
-        addColumn.clicked.connect(self.on_add_vizcol_click)
-        hlayout.addWidget(addColumn)
+        addSource = QPushButton('+', parent=controls)
+        addSource.clicked.connect(self.on_add_click)
+        hlayout.addWidget(addSource)
         # ...remove column button
-        self.removeColumn = QPushButton('-', parent=controls)
-        self.removeColumn.clicked.connect(self.on_remove_vizcol_click)
-        hlayout.addWidget(self.removeColumn)
+        self.removeSource = QPushButton('-', parent=controls)
+        self.removeSource.clicked.connect(self.on_remove_click)
+        hlayout.addWidget(self.removeSource)
         # ...duplicate column button
-        self.duplicateColumn = QPushButton('dup', parent=controls)
-        self.duplicateColumn.clicked.connect(self.on_duplicate_vizcol_click)
-        hlayout.addWidget(self.duplicateColumn)
+        self.duplicateSource = QPushButton('dup', parent=controls)
+        self.duplicateSource.clicked.connect(self.on_duplicate_click)
+        hlayout.addWidget(self.duplicateSource)
         # ...move up button
         self.moveUp = QPushButton('up', parent=controls)
         self.moveUp.clicked.connect(self.on_move_up_click)
@@ -198,49 +217,48 @@ class VisibleColumnsContextEditor(QWidget):
             self.tableView.horizontalHeader().setSectionResizeMode(index, QHeaderView.Stretch)
 
     @pyqtSlot()
-    def on_add_vizcol_click(self):
-        """Handler for adding visible column."""
+    def on_add_click(self):
+        """Handler for adding visible source."""
 
-        dialog = VisibleColumnDialog(self.table, allow_pseudocolumns=(self.context != 'entry'))
+        dialog = VisibleSourceDialog(self.table, mode=self.mode)
         code = dialog.exec_()
         if code == QDialog.Accepted:
             assert isinstance(self.body, list)
             self.body.append(dialog.entry)
             self.tableView.setModel(
-                VisibleColumnsContextEditor.TableModel(self.body)
+                VisibleSourcesContextEditor.TableModel(self.body)
             )
 
     @pyqtSlot()
-    def on_duplicate_vizcol_click(self):
-        """Handler for duplicating visible column."""
+    def on_duplicate_click(self):
+        """Handler for duplicating visible source."""
 
         assert isinstance(self.body, list)
         index = self.tableView.currentIndex().row()
         if index >= 0:
             duplicate = deepcopy(self.body[index])
-            print(duplicate)
             self.body.append(duplicate)
             self.tableView.setModel(
-                VisibleColumnsContextEditor.TableModel(self.body)
+                VisibleSourcesContextEditor.TableModel(self.body)
             )
 
     @pyqtSlot()
-    def on_remove_vizcol_click(self):
-        """Handler for removing a visible column."""
+    def on_remove_click(self):
+        """Handler for removing a visible source."""
 
         assert isinstance(self.body, list)
         index = self.tableView.currentIndex().row()
         if index >= 0:
             del self.body[index]
             self.tableView.setModel(
-                VisibleColumnsContextEditor.TableModel(self.body)
+                VisibleSourcesContextEditor.TableModel(self.body)
             )
             index = index if index < len(self.body) else index - 1
             self.tableView.selectRow(index)
 
     @pyqtSlot()
     def on_move_up_click(self):
-        """Handler for reordering (up) a visible column."""
+        """Handler for reordering (up) a visible source."""
 
         assert isinstance(self.body, list)
         i = self.tableView.currentIndex().row()
@@ -249,13 +267,13 @@ class VisibleColumnsContextEditor(QWidget):
             del self.body[i]
             self.body.insert(i-1, temp)
             self.tableView.setModel(
-                VisibleColumnsContextEditor.TableModel(self.body)
+                VisibleSourcesContextEditor.TableModel(self.body)
             )
             self.tableView.selectRow(i - 1)
 
     @pyqtSlot()
     def on_move_down_click(self):
-        """Handler for reordering (down) a visible column."""
+        """Handler for reordering (down) a visible source."""
 
         assert isinstance(self.body, list)
         i = self.tableView.currentIndex().row()
@@ -264,135 +282,154 @@ class VisibleColumnsContextEditor(QWidget):
             del self.body[i]
             self.body.insert(i+1, temp)
             self.tableView.setModel(
-                VisibleColumnsContextEditor.TableModel(self.body)
+                VisibleSourcesContextEditor.TableModel(self.body)
             )
             self.tableView.selectRow(i + 1)
 
     @pyqtSlot()
     def on_doubleclick(self):
-        """Handler for double-click event on a visible-column which opens the editor dialog."""
+        """Handler for double-click event on a visible-source which opens the editor dialog."""
 
         assert isinstance(self.body, list)
         i = self.tableView.currentIndex().row()
-        dialog = VisibleColumnDialog(self.table, entry=self.body[i], allow_pseudocolumns=(self.context != 'entry'))
+        dialog = VisibleSourceDialog(self.table, entry=self.body[i], mode=self.mode)
         code = dialog.exec_()
         if code == QDialog.Accepted:
             self.body[i] = dialog.entry
             self.tableView.setModel(
-                VisibleColumnsContextEditor.TableModel(self.body)
+                VisibleSourcesContextEditor.TableModel(self.body)
             )
 
     @pyqtSlot()
     def on_click(self):
-        """Handler for click event on a visible-column which records its index for use in combination with other commands."""
+        """Handler for click event on a visible-source which records its index for use in combination with other commands."""
 
         idx = self.tableView.currentIndex()
         # todo: enable/disable the up/down/- buttons
 
 
-class VisibleColumnDialog(QDialog):
-    """Dialog for editing or defining a visible column entry."""
+class VisibleSourceDialog(QDialog):
+    """Dialog for editing or defining a visible source entry."""
 
     COLUMN, CONSTRAINT, PSEUDO = 'Column', 'Constraint', 'Pseudo-Column'
 
-    def __init__(self, table, entry=None, allow_pseudocolumns=True):
+    AllowColumn, AllowPrimaryKey, AllowInboundForeignKey, AllowOutboundForeignKey, AllowPseudoColumn = 1, 2, 4, 8, 16
+    AllowAll = AllowColumn | AllowPrimaryKey | AllowOutboundForeignKey | AllowInboundForeignKey | AllowPseudoColumn
+    VisibleColumns = AllowColumn | AllowPrimaryKey | AllowOutboundForeignKey | AllowPseudoColumn
+    VisibleForeignKeys = AllowInboundForeignKey | AllowPseudoColumn
+
+    def __init__(self, table, entry=None, mode=AllowAll):
         """Init the dialog.
 
         :param table: the ERMrest table model object that contains the entry
-        :param entry: a visible column entry
+        :param entry: a visible source entry
         """
-        super(VisibleColumnDialog, self).__init__()
+        super(VisibleSourceDialog, self).__init__()
         assert isinstance(table, _erm.Table)
         self.table = table
         self.entry = entry
-        self.allow_pseudocolumns = allow_pseudocolumns
+        self.mode = mode
 
-        self.setWindowTitle(("Edit" if entry else "Add") + " Visible Column Entry")
+        self.setWindowTitle(("Edit" if entry else "Add") + " Visible Source Entry")
+        self.setMinimumWidth(500)
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Select the type of visible column and complete its details."))
+        layout.addWidget(QLabel("Select the type of visible source and complete its details."))
 
         # ...setup button group for radio buttons
         self.buttonGroup = buttonGroup = QButtonGroup(self)
         buttonGroup.buttonClicked.connect(self.on_buttonGroup_clicked)
 
-        # ...column
-        enabled = entry is None or isinstance(entry, str)
-        radioColumn = QRadioButton(self.COLUMN)
-        radioColumn.setChecked(enabled)
-        buttonGroup.addButton(radioColumn)
-        layout.addWidget(radioColumn)
+        # ...collection of all control groups
+        self.controlGroups = []
 
-        # ...column group controls
-        self.columnGroup = group = QFrame(parent=self)
-        group.setLayout(QVBoxLayout(group))
-        layout.addWidget(group)
-        match = -1  # keep track of index and update currIndex if match found
-        index = 0
-        self.columnCombo = combo = QComboBox(group)
-        for column in self.table.columns:
-            if self.entry == column.name:
-                match = index
-            combo.addItem(
-                column.name,
-                column
-            )
-            index += 1
-        # ...set curr index if match
-        if match > -1:
-            self.columnCombo.setCurrentIndex(match)
-        group.layout().addWidget(combo)
-        group.setEnabled(enabled)
+        # ...column
+        if bool(mode & VisibleSourceDialog.AllowColumn):
+            enabled = isinstance(entry, str)
+            radioColumn = QRadioButton(self.COLUMN)
+            radioColumn.setChecked(enabled)
+            buttonGroup.addButton(radioColumn)
+            layout.addWidget(radioColumn)
+
+            # ...column group controls
+            self.columnGroup = group = QFrame(parent=self)
+            group.setLayout(QVBoxLayout(group))
+            layout.addWidget(group)
+            match = -1  # keep track of index and update currIndex if match found
+            index = 0
+            self.columnCombo = combo = QComboBox(group)
+            for column in self.table.columns:
+                if self.entry == column.name:
+                    match = index
+                combo.addItem(
+                    column.name,
+                    column
+                )
+                index += 1
+            # ...set curr index if match
+            if match > -1:
+                self.columnCombo.setCurrentIndex(match)
+            group.layout().addWidget(combo)
+            group.setEnabled(enabled)
+            self.controlGroups.append(group)
 
         # ...constraint
-        enabled = isinstance(entry, list)
-        radioConstraint = QRadioButton(self.CONSTRAINT)
-        radioConstraint.setChecked(enabled)
-        buttonGroup.addButton(radioConstraint)
-        layout.addWidget(radioConstraint)
+        if bool(mode & (
+                VisibleSourceDialog.AllowPrimaryKey |
+                VisibleSourceDialog.AllowInboundForeignKey |
+                VisibleSourceDialog.AllowOutboundForeignKey)):
 
-        # ...constraint group controls
-        self.constraintGroup = group = QFrame(parent=self)
-        group.setLayout(QVBoxLayout(group))
-        layout.addWidget(group)
-        match = -1  # keep track of index and update currIndex if match found
-        index = 0
-        self.constraintCombo = combo = QComboBox(group)
-        # ...add keys
-        for key in self.table.keys:
-            if self.entry == _constraint_name(key):
-                match = index
-            combo.addItem(
-                key.constraint_name,
-                key
-            )
-            index += 1
-        # ...add fkeys
-        for fkey in self.table.foreign_keys:
-            if self.entry == _constraint_name(fkey):
-                match = index
-            combo.addItem(
-                fkey.constraint_name,
-                fkey
-            )
-            index += 1
-        # ...set curr index if match
-        if match > -1:
-            self.constraintCombo.setCurrentIndex(match)
-        group.layout().addWidget(combo)
-        group.setEnabled(enabled)
+            enabled = isinstance(entry, list)
+            radioConstraint = QRadioButton(self.CONSTRAINT)
+            radioConstraint.setChecked(enabled)
+            buttonGroup.addButton(radioConstraint)
+            layout.addWidget(radioConstraint)
+
+            # ...constraint group controls
+            self.constraintGroup = group = QFrame(parent=self)
+            group.setLayout(QVBoxLayout(group))
+            layout.addWidget(group)
+            match = -1  # keep track of index and update currIndex if match found
+            index = 0
+            self.constraintCombo = combo = QComboBox(group)
+
+            # ...add constraints
+            for (allowed, constraints) in [
+                (VisibleSourceDialog.AllowPrimaryKey, self.table.keys),
+                (VisibleSourceDialog.AllowOutboundForeignKey, self.table.foreign_keys),
+                (VisibleSourceDialog.AllowInboundForeignKey, self.table.referenced_by)
+            ]:
+                if bool(mode & allowed):
+                    for constraint in constraints:
+                        if self.entry == _constraint_name(constraint):
+                            match = index
+                        combo.addItem(
+                            constraint.constraint_name,
+                            constraint
+                        )
+                        index += 1
+
+            # ...set curr index if match
+            if match > -1:
+                self.constraintCombo.setCurrentIndex(match)
+
+            group.layout().addWidget(combo)
+            group.setEnabled(enabled)
+            self.controlGroups.append(group)
 
         # ...pseudo
-        enabled = self.allow_pseudocolumns and isinstance(entry, dict)
-        radioPseudo = QRadioButton(self.PSEUDO)
-        radioPseudo.setChecked(enabled)
-        radioPseudo.setEnabled(self.allow_pseudocolumns)
-        buttonGroup.addButton(radioPseudo)
-        layout.addWidget(radioPseudo)
+        if bool(mode & VisibleSourceDialog.AllowPseudoColumn):
+            enabled = isinstance(entry, dict)
+            radioPseudo = QRadioButton(self.PSEUDO)
+            radioPseudo.setChecked(enabled)
+            radioPseudo.setEnabled(True)
+            buttonGroup.addButton(radioPseudo)
+            layout.addWidget(radioPseudo)
 
-        # ...pseudo group controls
-        self.pseudoGroup = group = PseudoColumnEditWidget(self.table, self.entry, parent=self)
-        layout.addWidget(group)
-        group.setEnabled(enabled)
+            # ...pseudo group controls
+            self.pseudoGroup = group = PseudoColumnEditWidget(self.table, self.entry, parent=self)
+            layout.addWidget(group)
+            group.setEnabled(enabled)
+            self.controlGroups.append(group)
 
         # ...ok/cancel
         buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -424,24 +461,23 @@ class VisibleColumnDialog(QDialog):
             if 'source' in self.entry and len(self.entry['source']) == 0:
                 del self.entry['source']
 
-        return super(VisibleColumnDialog, self).accept()
+        return super(VisibleSourceDialog, self).accept()
 
     @pyqtSlot()
     def on_buttonGroup_clicked(self):
         """Handler for radio button selection: column, constraint, pseudo-column."""
 
+        # disable all
+        for group in self.controlGroups:
+            group.setEnabled(False)
+
+        # enable currently selected
         selected = self.buttonGroup.checkedButton().text()
         if selected == self.COLUMN:
             self.columnGroup.setEnabled(True)
-            self.constraintGroup.setEnabled(False)
-            self.pseudoGroup.setEnabled(False)
         elif selected == self.CONSTRAINT:
-            self.columnGroup.setEnabled(False)
             self.constraintGroup.setEnabled(True)
-            self.pseudoGroup.setEnabled(False)
         else:
-            self.columnGroup.setEnabled(False)
-            self.constraintGroup.setEnabled(False)
             self.pseudoGroup.setEnabled(True)
 
 
