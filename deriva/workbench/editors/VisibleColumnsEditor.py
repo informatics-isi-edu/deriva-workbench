@@ -1,4 +1,6 @@
 """Visible-Columns annotation editor."""
+from copy import deepcopy
+
 from PyQt5.QtWidgets import QLabel, QVBoxLayout, QFrame, QWidget, QTableView, QComboBox, QFormLayout, \
     QPushButton, QGroupBox, QHBoxLayout, QTabWidget, QLineEdit, QDialog, QButtonGroup, QRadioButton, \
     QCheckBox, QListWidget, QHeaderView, QDialogButtonBox
@@ -161,6 +163,10 @@ class VisibleColumnsContextEditor(QWidget):
         self.removeColumn = QPushButton('-', parent=controls)
         self.removeColumn.clicked.connect(self.on_remove_vizcol_click)
         hlayout.addWidget(self.removeColumn)
+        # ...duplicate column button
+        self.duplicateColumn = QPushButton('dup', parent=controls)
+        self.duplicateColumn.clicked.connect(self.on_duplicate_vizcol_click)
+        hlayout.addWidget(self.duplicateColumn)
         # ...move up button
         self.moveUp = QPushButton('up', parent=controls)
         self.moveUp.clicked.connect(self.on_move_up_click)
@@ -200,6 +206,20 @@ class VisibleColumnsContextEditor(QWidget):
         if code == QDialog.Accepted:
             assert isinstance(self.body, list)
             self.body.append(dialog.entry)
+            self.tableView.setModel(
+                VisibleColumnsContextEditor.TableModel(self.body)
+            )
+
+    @pyqtSlot()
+    def on_duplicate_vizcol_click(self):
+        """Handler for duplicating visible column."""
+
+        assert isinstance(self.body, list)
+        index = self.tableView.currentIndex().row()
+        if index >= 0:
+            duplicate = deepcopy(self.body[index])
+            print(duplicate)
+            self.body.append(duplicate)
             self.tableView.setModel(
                 VisibleColumnsContextEditor.TableModel(self.body)
             )
