@@ -1,0 +1,44 @@
+"""Schema editor widget that launches resource-specific editors.
+"""
+from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget, QPlainTextEdit
+
+from deriva.core import tag
+from .editors import JSONEditor, AnnotationEditor, VisibleColumnsEditor
+
+
+class SchemaEditor(QWidget):  # todo: may want to rename this to 'SchemaEditorFrame' or '...Panel'
+    """Schema editor widget.
+
+    This serves as a container for a range of resource-specific editor.
+    """
+
+    def __init__(self):
+        super(SchemaEditor, self).__init__()
+        self.editor = QPlainTextEdit()
+        self.editor.setEnabled(False)
+        vlayout = QVBoxLayout()
+        vlayout.setContentsMargins(0, 0, 0, 0)
+        vlayout.addWidget(QLabel('Schema Editor'))
+        vlayout.addWidget(self.editor)
+        self.setAutoFillBackground(True)
+        self.setLayout(vlayout)
+
+    @property
+    def data(self):
+        return self.editor.data
+
+    @data.setter
+    def data(self, value):
+
+        if value is None:
+            widget = QPlainTextEdit()
+            widget.setEnabled(False)
+        elif hasattr(value, 'prejson'):
+            widget = JSONEditor(value.prejson())
+        elif value.get('tag') == tag.visible_columns:
+            widget = VisibleColumnsEditor(value)
+        else:
+            widget = AnnotationEditor(value)
+
+        self.layout().replaceWidget(self.editor, widget)
+        self.editor = widget
