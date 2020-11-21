@@ -14,8 +14,30 @@ logger = logging.getLogger(__name__)
 
 
 def _constraint_name(constraint):
-    """Returns the annotation-friendly form of the constraint name."""
+    """Returns the annotation-friendly form of the constraint name.
+    """
     return [constraint.constraint_schema.name if constraint.constraint_schema else '', constraint.constraint_name]
+
+
+def _source_component_to_str(component):
+    """Readable string representation of a `source` path component.
+    """
+    return (
+        component if isinstance(component, str) else
+        '%s:%s (inbound)' % tuple(component['inbound']) if 'inbound' in component else
+        '%s:%s (outbound)' % tuple(component['outbound']) if 'outbound' in component else
+        '%s <<unexpected structure>>' % component
+    )
+
+def _source_path_to_str(source):
+    """Readable string representation of a `source` path.
+    """
+    if isinstance(source, str):
+        return source
+    elif isinstance(source, list) and all(isinstance(elem, str) for elem in source):
+        return source[1]
+    else:
+        return ' > '.join(_source_component_to_str(component) for component in source)
 
 
 class VisibleSourcesEditor(QWidget):
@@ -107,22 +129,19 @@ class VisibleSourcesContextEditor(QWidget):
         if isinstance(entry, str):
             return (
                 'Column',
-                entry,
-                ''
+                entry
             )
         elif isinstance(entry, list):
             assert len(entry) == 2
             return (
                 'Constraint',
-                entry[1],
-                ''
+                entry[1]
             )
         else:
             assert isinstance(entry, dict)
             return (
                 'Pseudo',
-                str(entry.get('source', entry.get('sourcekey', 'virtual'))),
-                str(entry)
+                _source_path_to_str(entry.get('source', entry.get('sourcekey', 'virtual')))
             )
 
     class TableModel(QAbstractTableModel):
@@ -130,7 +149,7 @@ class VisibleSourcesContextEditor(QWidget):
 
         def __init__(self, body):
             super(VisibleSourcesContextEditor.TableModel, self).__init__()
-            self.headers = ["Type", "Source", "Additional Details"]
+            self.headers = ["Type", "Source"]
             self.rows = [
                 VisibleSourcesContextEditor._entry2row(entry) for entry in body
             ]
@@ -171,9 +190,17 @@ class VisibleSourcesContextEditor(QWidget):
 
         # table view
         self.model = model = VisibleSourcesContextEditor.TableModel(body)
-        self.tableView = tableView = QTableView()
-        tableView.setModel(model)
-        tableView.setWordWrap(True)
+        self.tableView = QTableView(parent=self)
+        self.tableView.setModel(model)
+
+        # ...table selection change
+        self.tableView.clicked.connect(self.on_click)
+        self.tableView.doubleClicked.connect(self.on_doubleclick)
+
+        # ...table view styling
+        self.tableView.setWordWrap(True)
+        self.tableView.setAlternatingRowColors(True)
+        self.tableView.horizontalHeader().setStretchLastSection(True)
 
         # controls frame
         controls = QFrame()
@@ -206,19 +233,10 @@ class VisibleSourcesContextEditor(QWidget):
 
         # tab layout
         layout = QVBoxLayout(self)
-        layout.addWidget(tableView)
+        layout.addWidget(self.tableView)
         layout.addWidget(controls)
         self.setLayout(layout)
         self.setAutoFillBackground(True)
-
-        # table selection change
-        self.tableView.clicked.connect(self.on_click)
-        self.tableView.doubleClicked.connect(self.on_doubleclick)
-
-        # table view styling
-        self.tableView.setAlternatingRowColors(True)
-        for index in [1, 2]:
-            self.tableView.horizontalHeader().setSectionResizeMode(index, QHeaderView.Stretch)
 
     @pyqtSlot()
     def on_add_click(self):
@@ -821,7 +839,7 @@ class SourceEntryWidget(QWidget):
                     fkey = self.table.schema.model.fkey(item['inbound'])
                     self.context.append(fkey.table)
                 # update the source list
-                self.sourceList.addItem(self._source2str(item))
+                self.sourceList.addItem(_source_component_to_str(item))
                 validated_path.append(item)
         except KeyError as e:
             logger.error("Invalid path component %s found in source entry %s" % (str(e), str(source)))
@@ -850,17 +868,6 @@ class SourceEntryWidget(QWidget):
         controls.layout().addWidget(self.popButton)
         # ...add remaining controls to form
         vlayout.addWidget(controls)
-
-    @classmethod
-    def _source2str(cls, source):
-        """Readable string from source entry."""
-
-        return (
-            source if isinstance(source, str) else
-            '%s:%s (inbound)' % tuple(source['inbound']) if 'inbound' in source else
-            '%s:%s (outbound)' % tuple(source['outbound']) if 'outbound' in source else
-            '%s <<unexpected structure>>' % source
-        )
 
     def _updateAvailableSourcesFromTable(self, table):
         """Updates the list of available sources based on the given table."""
