@@ -323,7 +323,7 @@ class WorkbenchWindow(QMainWindow):
         """
         self.restoreCursor()
         if success:
-            msg = "Found %d error(s) in the current object's annotations." % len(result)
+            msg = "Found %d error(s) in the current object's annotations. See log display for additional details." % len(result)
             QMessageBox.information(
                 self,
                 "Validation Results",
@@ -475,7 +475,7 @@ class _WorkbenchWindowUI(object):
         hsplitter = QSplitter(Qt.Horizontal)
         hsplitter.addWidget(self.browser)
         hsplitter.addWidget(self.editor)
-        hsplitter.setSizes([100,200])
+        hsplitter.setSizes([300, 900])
 
         # Splitter for Log messages
         self.splitter = QSplitter(Qt.Vertical)
@@ -487,15 +487,15 @@ class _WorkbenchWindowUI(object):
         self.logTextBrowser.widget.setStyleSheet(
             """
             QPlainTextEdit {
-                    border: 2px solid grey;
-                    border-radius: 5px;
-                    background-color: lightgray;
+                    border: 1px solid grey;
+                    border-radius: 3px;
+                    background-color: white;
             }
             """)
         self.splitter.addWidget(self.logTextBrowser.widget)
 
         # add splitter
-        self.splitter.setSizes([500, 100])
+        self.splitter.setSizes([800, 200])
         self.verticalLayout.addWidget(self.splitter)
 
         #

@@ -1,12 +1,11 @@
 """Schema editor widget that launches resource-specific editors.
 """
 from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget, QPlainTextEdit
-
 from deriva.core import tag
 from .editors import JSONEditor, AnnotationEditor, VisibleSourcesEditor, SourceDefinitionsEditor
 
 
-class SchemaEditor(QWidget):  # todo: may want to rename this to 'SchemaEditorFrame' or '...Panel'
+class SchemaEditor(QWidget):
     """Schema editor widget.
 
     This serves as a container for a range of resource-specific editor.
