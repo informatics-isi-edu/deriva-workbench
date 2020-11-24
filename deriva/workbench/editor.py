@@ -3,7 +3,7 @@
 from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget, QPlainTextEdit
 
 from deriva.core import tag
-from .editors import JSONEditor, AnnotationEditor, VisibleSourcesEditor
+from .editors import JSONEditor, AnnotationEditor, VisibleSourcesEditor, SourceDefinitionsEditor
 
 
 class SchemaEditor(QWidget):  # todo: may want to rename this to 'SchemaEditorFrame' or '...Panel'
@@ -38,6 +38,9 @@ class SchemaEditor(QWidget):  # todo: may want to rename this to 'SchemaEditorFr
         elif value.get('tag') == tag.visible_columns or value.get('tag') == tag.visible_foreign_keys:
             assert value and isinstance(value, dict) and 'parent' in value
             widget = VisibleSourcesEditor(value['parent'], value['tag'])
+        elif value.get('tag') == tag.source_definitions:
+            assert value and isinstance(value, dict) and 'parent' in value
+            widget = SourceDefinitionsEditor(value['parent'])
         else:
             widget = AnnotationEditor(value)
 

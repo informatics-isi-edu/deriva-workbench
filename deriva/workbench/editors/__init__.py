@@ -1,4 +1,5 @@
 """Workbench editors package.
 """
-from .JSONEditor import JSONEditor, AnnotationEditor
-from .VisibleSourcesEditor import VisibleSourcesEditor
+from .json_editor import JSONEditor, AnnotationEditor
+from .visible_sources import VisibleSourcesEditor
+from .source_definitions import SourceDefinitionsEditor

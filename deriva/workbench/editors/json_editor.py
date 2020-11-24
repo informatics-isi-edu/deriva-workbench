@@ -1,4 +1,4 @@
-"""JSON editors.
+"""JSON editors for bare schema viewing and bare annotation editing.
 """
 import json
 from PyQt5.QtGui import QFont
