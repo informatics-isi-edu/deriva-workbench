@@ -50,7 +50,8 @@ setup(
     ],
     extras_require={
         'PyQt5': ["PyQt5==5.11.3"],
-        'PyQtWebEngine': ["PyQtWebEngine>=5.12.1"]
+        'PyQtWebEngine': ["PyQtWebEngine>=5.12.1"],
+        'PyQt5-stubs': ["PyQt5-stubs>=5.14.2.2"]
     },
     license='GNU GPL 3.0',
     classifiers=[
