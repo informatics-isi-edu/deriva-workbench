@@ -179,7 +179,7 @@ class WorkbenchWindow(QMainWindow):
     def enableControls(self):
         self.ui.actionUpdate.setEnabled(self.connection.get("catalog") is not None and self.identity is not None)  # and self.auth_window.authenticated())
         self.ui.actionRefresh.setEnabled(self.connection.get("catalog") is not None)
-        self.ui.actionValidate.setEnabled(False)
+        self.ui.actionValidate.setEnabled(hasattr(self.ui.browser.current_selection, 'annotations'))
         self.ui.actionCancel.setEnabled(False)
         self.ui.actionOptions.setEnabled(True)
         self.ui.actionLogin.setEnabled(self.identity is None)  # not self.auth_window.authenticated())
@@ -323,7 +323,14 @@ class WorkbenchWindow(QMainWindow):
         """
         self.restoreCursor()
         if success:
-            print("SUCCESS", result)
+            msg = "Found %d error(s) in the current object's annotations." % len(result)
+            QMessageBox.information(
+                self,
+                "Validation Results",
+                msg,
+                QMessageBox.Ok
+            )
+            self.resetUI(msg)
         else:
             self.resetUI(status, detail, success)
 
