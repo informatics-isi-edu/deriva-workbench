@@ -5,7 +5,7 @@ from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtWidgets import QGroupBox, QWidget, QFormLayout, QComboBox, QLineEdit, QCheckBox, QTextEdit, QVBoxLayout, \
     QListWidget, QHBoxLayout, QPushButton
 from deriva.core import ermrest_model as _erm, tag as _tag
-from .common import SubsetSelectionWidget, source_component_to_str, constraint_name
+from .common import SubsetSelectionWidget, source_component_to_str, constraint_name, set_value_or_del_key
 
 logger = logging.getLogger(__name__)
 
@@ -252,10 +252,7 @@ class PseudoColumnEditWidget(QGroupBox):
         display = self.entry.get('display', {})
 
         # set or delete value
-        if cond:
-            display[key] = value
-        elif key in display:
-            del display[key]
+        set_value_or_del_key(display, cond, key, value)
 
         # update or delete display
         if display:

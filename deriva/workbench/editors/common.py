@@ -3,10 +3,25 @@
 from collections.abc import Callable
 import logging
 from typing import Any
-from PyQt5.QtWidgets import QVBoxLayout, QWidget, QCheckBox, QListWidget, QListWidgetItem
+from PyQt5.QtWidgets import QVBoxLayout, QWidget, QCheckBox, QListWidget, QListWidgetItem, QComboBox
 from PyQt5.QtCore import Qt, pyqtSlot, pyqtSignal
 
 logger = logging.getLogger(__name__)
+
+
+def set_value_or_del_key(container: dict, cond: bool, key: str, value):
+    """Conditionally, set the value of the property or delete the key from the containing dict.
+
+    :param container: the dictionary that contains the key-value pair
+    :param cond: indicates if the key should be set to the value or dropped from the container
+    :param key: dictionary key (i.e., 'wait_for')
+    :param value: valid value for the key
+    """
+    # set or delete value
+    if cond:
+        container[key] = value
+    elif key in container:
+        del container[key]
 
 
 def constraint_name(constraint):
@@ -145,4 +160,33 @@ class SomeOrAllSelectorWidget(QWidget):
     def _on_subset_changed(self):
         """Propagates the valueChanged signal from the subset selection widget.
         """
+        self.valueChanged.emit()
+
+
+class TemplateEngineWidget(QComboBox):
+    """Widget for the `template_engine` property.
+    """
+
+    __choices__ = ['handlebars', 'mustache']
+    valueChanged = pyqtSignal()
+
+    def __init__(self, annotation: dict, parent: QWidget = None):
+        super(TemplateEngineWidget, self).__init__(parent=parent)
+        self._annotation = annotation
+        self.addItems([''] + self.__choices__)
+        self.setPlaceholderText('Select a template engine')
+        self.setCurrentIndex(
+            self.findText(self._annotation.get('template_engine', '')) or -1
+        )
+        self.currentIndexChanged.connect(self._on_index_changed)
+
+    @pyqtSlot()
+    def _on_index_changed(self):
+        template_engine = self.currentText()
+        set_value_or_del_key(
+            self._annotation,
+            template_engine in self.__choices__,
+            'template_engine',
+            template_engine
+        )
         self.valueChanged.emit()
