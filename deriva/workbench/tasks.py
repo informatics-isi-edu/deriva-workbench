@@ -1,12 +1,13 @@
 """Workbench background tasks.
 """
 from PyQt5.QtCore import QObject, pyqtSignal
-from deriva.core import format_exception
+from deriva.core import format_exception, annotation
 from deriva.qt import async_execute, Task
 
 
 class WorkbenchTask(QObject):
-    """Base class for workbench tasks, based on similar class from the `deriva.qt` package."""
+    """Base class for workbench tasks, based on similar class from the `deriva.qt` package.
+    """
 
     status_update_signal = pyqtSignal(bool, str, str, object)
     progress_update_signal = pyqtSignal(int, int)
@@ -35,7 +36,8 @@ class WorkbenchTask(QObject):
 
 
 class SessionQueryTask(WorkbenchTask):
-    """Queries the server-side `session` resource."""
+    """Queries the server-side `session` resource.
+    """
 
     def __init__(self, connection, parent=None):
         super(SessionQueryTask, self).__init__(connection, parent)
@@ -52,7 +54,8 @@ class SessionQueryTask(WorkbenchTask):
 
 
 class FetchCatalogModelTask(WorkbenchTask):
-    """Fetches the catalog schema resource."""
+    """Fetches the catalog schema resource.
+    """
 
     def __init__(self, connection, parent=None):
         super(FetchCatalogModelTask, self).__init__(connection, parent)
@@ -70,7 +73,8 @@ class FetchCatalogModelTask(WorkbenchTask):
 
 
 class ModelApplyTask(WorkbenchTask):
-    """Applies the changes to the catalog configuration (acls and annotations)."""
+    """Applies the changes to the catalog configuration (acls and annotations).
+    """
 
     def __init__(self, model, connection, parent=None):
         super(ModelApplyTask, self).__init__(connection, parent)
@@ -86,4 +90,24 @@ class ModelApplyTask(WorkbenchTask):
 
     def apply(self):
         self.task = Task(self.model.apply, [], self.result_callback)
+        self.start()
+
+
+class ValidateAnnotationsTask(WorkbenchTask):
+    """Validates annotations for the selected model object.
+    """
+
+    def __init__(self, model_obj, connection, parent=None):
+        super(ValidateAnnotationsTask, self).__init__(connection, parent)
+        assert connection.get('catalog')
+        self.model_obj = model_obj
+
+    def result_callback(self, success, result):
+        self.set_status(success,
+                        "Validation task success." if success else "Validation task failed.",
+                        "" if success else format_exception(result),
+                        result if success else None)
+
+    def validate(self):
+        self.task = Task(annotation.validate, [self.model_obj], self.result_callback)
         self.start()

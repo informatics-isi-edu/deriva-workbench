@@ -1,6 +1,6 @@
 """Schema browser widget.
 """
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSlot, pyqtSignal, QModelIndex
 from PyQt5.QtWidgets import QLabel, QVBoxLayout, QTreeView, QWidget
 from PyQt5.Qt import QStandardItemModel, QStandardItem
 from PyQt5.QtGui import QFont, QColor
@@ -27,9 +27,11 @@ class _SchemaBrowserItem(QStandardItem):
 
 class SchemaBrowser(QWidget):
 
-    def __init__(self, onSelect=None):
+    clicked = pyqtSignal()
+    doubleClicked = pyqtSignal()
+
+    def __init__(self):
         super(SchemaBrowser, self).__init__()
-        self.onSelect = onSelect
 
         self.treeView = QTreeView()
         self.treeView.setHeaderHidden(True)
@@ -42,9 +44,11 @@ class SchemaBrowser(QWidget):
 
         self.setLayout(vlayout)
         self.model = None
+        self.current_selection = None
 
     def setModel(self, model):
         self.model = model
+        self.current_selection = None
 
         treeModel = QStandardItemModel()
         rootNode = treeModel.invisibleRootItem()
@@ -99,11 +103,17 @@ class SchemaBrowser(QWidget):
         treeView = QTreeView()
         treeView.setHeaderHidden(True)
         treeView.setModel(treeModel)
-        treeView.doubleClicked.connect(self.getValue)
+        treeView.doubleClicked.connect(self._on_double_clicked)
+        treeView.clicked.connect(self._on_clicked)
         self.layout().replaceWidget(self.treeView, treeView)
         self.treeView = treeView
 
-    def getValue(self, val):
-        data = val.data(Qt.UserRole)
-        if self.onSelect:
-            self.onSelect(data)
+    @pyqtSlot(QModelIndex)
+    def _on_double_clicked(self, index: QModelIndex):
+        self.current_selection = index.data(Qt.UserRole)
+        self.doubleClicked.emit()
+
+    @pyqtSlot(QModelIndex)
+    def _on_clicked(self, index: QModelIndex):
+        self.current_selection = index.data(Qt.UserRole)
+        self.clicked.emit()

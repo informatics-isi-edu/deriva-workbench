@@ -15,7 +15,7 @@ from . import __version__
 from .options import OptionsDialog
 from .browser import SchemaBrowser
 from .editor import SchemaEditor
-from .tasks import SessionQueryTask, FetchCatalogModelTask, ModelApplyTask
+from .tasks import SessionQueryTask, FetchCatalogModelTask, ModelApplyTask, ValidateAnnotationsTask
 
 
 class WorkbenchWindow(QMainWindow):
@@ -39,6 +39,8 @@ class WorkbenchWindow(QMainWindow):
 
         # ui properties
         self.ui = _WorkbenchWindowUI(self)
+        self.ui.browser.clicked.connect(self._on_browser_clicked)
+        self.ui.browser.doubleClicked.connect(self._on_browser_double_clicked)
         self.setWindowTitle(self.ui.title)
         self.progress_update_signal.connect(self.updateProgress)
 
@@ -54,6 +56,17 @@ class WorkbenchWindow(QMainWindow):
         self.show()
         self.config = None
         self.configure(hostname, catalog_id)
+
+    @pyqtSlot()
+    def _on_browser_double_clicked(self):
+        self.ui.editor.data = self.ui.browser.current_selection
+
+    @pyqtSlot()
+    def _on_browser_clicked(self):
+        if self.ui.browser.current_selection and hasattr(self.ui.browser.current_selection, 'annotations'):
+            self.ui.actionValidate.setEnabled(True)
+        else:
+            self.ui.actionValidate.setEnabled(False)
 
     def configure(self, hostname, catalog_id):
         """Configures the connection properties.
@@ -165,7 +178,8 @@ class WorkbenchWindow(QMainWindow):
 
     def enableControls(self):
         self.ui.actionUpdate.setEnabled(self.connection.get("catalog") is not None and self.identity is not None)  # and self.auth_window.authenticated())
-        self.ui.actionRefresh.setEnabled(self.connection.get("catalog") is not None)  # self.auth_window.authenticated())
+        self.ui.actionRefresh.setEnabled(self.connection.get("catalog") is not None)
+        self.ui.actionValidate.setEnabled(False)
         self.ui.actionCancel.setEnabled(False)
         self.ui.actionOptions.setEnabled(True)
         self.ui.actionLogin.setEnabled(self.identity is None)  # not self.auth_window.authenticated())
@@ -176,6 +190,7 @@ class WorkbenchWindow(QMainWindow):
     def disableControls(self):
         self.ui.actionUpdate.setEnabled(False)
         self.ui.actionRefresh.setEnabled(False)
+        self.ui.actionValidate.setEnabled(False)
         self.ui.actionOptions.setEnabled(False)
         self.ui.actionLogin.setEnabled(False)
         self.ui.actionLogout.setEnabled(False)
@@ -239,9 +254,6 @@ class WorkbenchWindow(QMainWindow):
             self.identity = result["client"]["id"]
             display_name = result["client"]["full_name"]
             self.setWindowTitle("%s (%s - %s)" % (self.ui.title, self.connection["host"], display_name))
-            self.ui.actionLogout.setEnabled(True)
-            self.ui.actionLogin.setEnabled(False)
-            self.ui.actionRefresh.setEnabled(True)
             self.updateStatus("Logged in.")
             self.connection["catalog"] = self.connection["server"].connect_ermrest(self.connection["catalog_id"])
             self.enableControls()
@@ -275,6 +287,43 @@ class WorkbenchWindow(QMainWindow):
             self.ui.browser.setModel(result)
             self.ui.editor.data = None
             self.resetUI("Fetched catalog model...")
+        else:
+            self.resetUI(status, detail, success)
+
+    @pyqtSlot()
+    def on_actionValidate_triggered(self):
+        """Triggered on "validate" action.
+        """
+        # check if connected to a catalog
+        if not self.connection["catalog"]:
+            self.updateStatus("Cannot validate annotations. Not connected to a catalog.")
+            return
+
+        # check if current selection has 'annotations' container
+        current_selection = self.ui.browser.current_selection
+        if not hasattr(current_selection, 'annotations'):
+            self.updateStatus("Cannot validate annotations. Current selected object does not have 'annotations'.")
+
+        # do validation
+        self.validatAnnotations(current_selection)
+
+    def validatAnnotations(self, current_selection):
+        """Fires off annotation validation task.
+        """
+        assert hasattr(current_selection, 'annotations'), "Current selection does not have 'annotations'."
+        task = ValidateAnnotationsTask(current_selection, self.connection)
+        task.status_update_signal.connect(self.onValidateAnnotationsResult)
+        task.validate()
+        qApp.setOverrideCursor(Qt.WaitCursor)
+        self.ui.actionCancel.setEnabled(True)
+
+    @pyqtSlot(bool, str, str, object)
+    def onValidateAnnotationsResult(self, success, status, detail, result):
+        """Handles annotations validation results.
+        """
+        self.restoreCursor()
+        if success:
+            print("SUCCESS", result)
         else:
             self.resetUI(status, detail, success)
 
@@ -414,7 +463,7 @@ class _WorkbenchWindowUI(object):
         self.verticalLayout.setObjectName("verticalLayout")
 
         # Setup main body splitter
-        self.browser = SchemaBrowser(self.handleSelect)
+        self.browser = SchemaBrowser()
         self.editor = SchemaEditor()
         hsplitter = QSplitter(Qt.Horizontal)
         hsplitter.addWidget(self.browser)
@@ -461,6 +510,14 @@ class _WorkbenchWindowUI(object):
         self.actionRefresh.setToolTip(mainWin.tr("Refresh the catalog model from the server"))
         self.actionRefresh.setShortcut(mainWin.tr("Ctrl+R"))
         self.actionRefresh.setEnabled(False)
+
+        # Validate
+        self.actionValidate = QAction(mainWin)
+        self.actionValidate.setObjectName("actionValidate")
+        self.actionValidate.setText(mainWin.tr("Validate"))
+        self.actionValidate.setToolTip(mainWin.tr("Validate annotations for the currently selected model object"))
+        self.actionValidate.setShortcut(mainWin.tr("Ctrl+I"))
+        self.actionValidate.setEnabled(False)
 
         # Cancel
         self.actionCancel = QAction(mainWin)
@@ -524,7 +581,10 @@ class _WorkbenchWindowUI(object):
         # Refresh
         self.mainToolBar.addAction(self.actionRefresh)
         self.actionRefresh.setIcon(qApp.style().standardIcon(QStyle.SP_BrowserReload))
-        self.actionRefresh.setIcon(qApp.style().standardIcon(QStyle.SP_BrowserReload))
+
+        # Validate
+        self.mainToolBar.addAction(self.actionValidate)
+        self.actionValidate.setIcon(qApp.style().standardIcon(QStyle.SP_DialogApplyButton))
 
         # Cancel
         self.mainToolBar.addAction(self.actionCancel)
@@ -569,8 +629,3 @@ class _WorkbenchWindowUI(object):
 
         # Finalize UI setup
         QMetaObject.connectSlotsByName(mainWin)
-
-    def handleSelect(self, data):
-        """Handler for the model object selection signaled by the schema browser widget.
-        """
-        self.editor.data = data
