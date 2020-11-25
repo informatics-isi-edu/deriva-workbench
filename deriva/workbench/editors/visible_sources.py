@@ -3,91 +3,68 @@
 from copy import deepcopy
 import logging
 from PyQt5.QtWidgets import QLabel, QVBoxLayout, QFrame, QWidget, QTableView, QComboBox, QPushButton, QHBoxLayout, \
-    QTabWidget, QLineEdit, QDialog, QButtonGroup, QRadioButton, QDialogButtonBox
+    QDialog, QButtonGroup, QRadioButton, QDialogButtonBox
 from PyQt5.QtCore import QAbstractTableModel, QVariant, Qt, pyqtSlot
 from deriva.core import tag as _tag, ermrest_model as _erm
 from .common import constraint_name, source_path_to_str
+from .tabbed_contexts import TabbedContextsWidget
 from .pseudo_column import PseudoColumnEditWidget
 
 logger = logging.getLogger(__name__)
 
 
-class VisibleSourcesEditor(QWidget):
+class VisibleSourcesEditor(TabbedContextsWidget):
     """Visible sources (column or foreign key) annotation editor.
     """
 
     table: _erm.Table
     tag: str
 
-    def __init__(self, table, tag):
+    def __init__(self, table, tag, parent: QWidget = None):
         """Initialize visible sources editor.
         """
-        super(VisibleSourcesEditor, self).__init__()
+        super(VisibleSourcesEditor, self).__init__(parent=parent)
         assert isinstance(table, _erm.Table)
         self.table, self.tag = table, tag
-        self.body = self.table.annotations[tag]
+        self.body: dict = self.table.annotations[tag]
+        self.createContextRequested.connect(self._on_creatContext)
+        self.removeContextRequested.connect(self._on_removeContext)
 
         # create tabs for each context
-        self.tabs = QTabWidget()
         for context in self.body:
             if context == 'filter':
                 contents = self.body[context].get('and', [])
             else:
                 contents = self.body[context]
-            tab = VisibleSourcesContextEditor(self.table, self.tag, context, contents, self.on_remove_context)
-            self.tabs.addTab(tab, context)
+            tab = VisibleSourcesContextEditor(self.table, self.tag, context, contents)
+            self.addContext(tab, context)
 
-        # tab for creating a new context
-        layout = QHBoxLayout(self)
-        layout.addWidget(QLabel('New Context Name:'))
-        # ...context line editor
-        self.line = QLineEdit()
-        self.line.textChanged.connect(self.on_context_line_edit_change)
-        layout.addWidget(self.line)
-        # ...add context button
-        self.addContext = QPushButton('Add')
-        self.addContext.setEnabled(False)
-        self.addContext.clicked.connect(self.on_add_context)
-        layout.addWidget(self.addContext)
-        tab = QWidget()
-        tab.setLayout(layout)
-        tab.setAutoFillBackground(True)
-        self.tabs.addTab(tab, "+")
+        # set first context active
+        if self.body:
+            self.setActiveContext(list(self.body.keys())[0])
 
-        # add tabs to layout
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.tabs)
-        self.setLayout(layout)
-        self.setAutoFillBackground(True)
-
-    @pyqtSlot()
-    def on_remove_context(self):
-        index = self.tabs.currentIndex()
-        context = self.tabs.currentWidget().context
-        self.tabs.removeTab(index)
-        del self.body[context]
-
-    @pyqtSlot()
-    def on_context_line_edit_change(self):
-        context = self.line.text()
-        if context not in self.body:
-            self.addContext.setEnabled(True)
-        else:
-            self.addContext.setEnabled(False)
-
-    @pyqtSlot()
-    def on_add_context(self):
-        context = self.line.text()
-        self.line.clear()
-        self.addContext.setEnabled(False)
+    @pyqtSlot(str)
+    def _on_creatContext(self, context):
+        """Handles the 'createContextRequested' signal.
+        """
+        # create new context entry
         if context == 'filter':
             self.body[context] = {'and': []}
             contents = self.body[context]['and']
         else:
             self.body[context] = []
             contents = self.body[context]
-        tab = VisibleSourcesContextEditor(self.table, self.tag, context, contents, self.on_remove_context)
-        self.tabs.insertTab(len(self.tabs)-1, tab, context)
+
+        # create and add new context editor
+        contextEditor = VisibleSourcesContextEditor(self.table, self.tag, context, contents)
+        self.addContext(contextEditor, context)
+
+    @pyqtSlot(str)
+    def _on_removeContext(self, context):
+        """Handles the 'removeContextRequested' signal.
+        """
+        del self.body[context]
+        self.removeContext(context)
 
 
 class VisibleSourcesContextEditor(QWidget):
@@ -146,11 +123,11 @@ class VisibleSourcesContextEditor(QWidget):
     context: str
     body: list
 
-    def __init__(self, table, tag, context, body, on_remove_context):
+    def __init__(self, table, tag, context, body):
         """Initialize the VisibleSourcesContextEditor.
         """
         super(VisibleSourcesContextEditor, self).__init__()
-        self.table, self.context, self.body, self.on_remove_context = table, context, body, on_remove_context
+        self.table, self.context, self.body = table, context, body
 
         # add/edit mode
         if tag == _tag.visible_columns:
@@ -196,10 +173,6 @@ class VisibleSourcesContextEditor(QWidget):
         self.moveDown = QPushButton('down', parent=controls)
         self.moveDown.clicked.connect(self.on_move_down_click)
         hlayout.addWidget(self.moveDown)
-        # ...remove context button
-        removeContext = QPushButton('- context', parent=controls)
-        removeContext.clicked.connect(self.on_remove_context)
-        hlayout.addWidget(removeContext)
         controls.setLayout(hlayout)
 
         # tab layout
