@@ -3,7 +3,8 @@
 from collections.abc import Callable
 import logging
 from typing import Any
-from PyQt5.QtWidgets import QVBoxLayout, QWidget, QCheckBox, QListWidget, QListWidgetItem, QComboBox
+from PyQt5.QtWidgets import QVBoxLayout, QWidget, QCheckBox, QListWidget, QListWidgetItem, QComboBox, QLineEdit
+from PyQt5.QtGui import QValidator
 from PyQt5.QtCore import Qt, pyqtSlot, pyqtSignal
 
 logger = logging.getLogger(__name__)
@@ -188,5 +189,78 @@ class TemplateEngineWidget(QComboBox):
             template_engine in self.__choices__,
             'template_engine',
             template_engine
+        )
+        self.valueChanged.emit()
+
+
+class SimpleTextPropertyWidget(QLineEdit):
+    """A simple property editor widget extending QLineEdit.
+    """
+
+    valueChanged = pyqtSignal()
+
+    def __init__(
+            self,
+            key: str,
+            body: {},
+            placeholder: str = '',
+            validator: QValidator = None,
+            parent: QWidget = None):
+        super(SimpleTextPropertyWidget, self).__init__(parent=parent)
+        self.key, self.body = key, body
+        self.setText(self.body.get(key, ''))
+        self.setPlaceholderText(placeholder)
+        self.textChanged.connect(self._on_textChanged)
+        if validator:
+            self.setValidator(validator)
+
+    @pyqtSlot()
+    def _on_textChanged(self):
+        """Handles textChanged events.
+        """
+        value = self.text()
+        set_value_or_del_key(
+            self.body,
+            bool(value),
+            self.key,
+            value
+        )
+        self.valueChanged.emit()
+
+
+class SimpleBooleanPropertyWidget(QCheckBox):
+    """A simple boolean property editor widget.
+    """
+
+    valueChanged = pyqtSignal()
+
+    def __init__(
+            self,
+            text: str,
+            key: str,
+            body: {},
+            parent: QWidget = None):
+        """Initialize the widget
+
+        :param text: checkbox text label
+        :param key: annotation key
+        :param body: annotation body (container)
+        :param parent: parent widget
+        """
+        super(SimpleBooleanPropertyWidget, self).__init__(text, parent=parent)
+        self.key, self.body = key, body
+        self.setChecked(self.body.get(key, False))
+        self.clicked.connect(self._on_clicked)
+
+    @pyqtSlot()
+    def _on_clicked(self):
+        """Handles clicked events.
+        """
+        value = self.isChecked()
+        set_value_or_del_key(
+            self.body,
+            bool(value),
+            self.key,
+            value
         )
         self.valueChanged.emit()

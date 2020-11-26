@@ -2,7 +2,8 @@
 """
 from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget, QPlainTextEdit
 from deriva.core import tag
-from .editors import JSONEditor, AnnotationEditor, VisibleSourcesEditor, SourceDefinitionsEditor, CitationEditor
+from .editors import JSONEditor, AnnotationEditor, VisibleSourcesEditor, SourceDefinitionsEditor, CitationEditor, \
+    TableDisplayContextsEditor
 
 
 class SchemaEditor(QWidget):
@@ -43,6 +44,9 @@ class SchemaEditor(QWidget):
         elif value.get('tag') == tag.citation:
             assert value and isinstance(value, dict) and 'parent' in value
             widget = CitationEditor(value['parent'])
+        elif value.get('tag') == tag.table_display:
+            assert value and isinstance(value, dict) and 'parent' in value
+            widget = TableDisplayContextsEditor(value['parent'])
         else:
             widget = AnnotationEditor(value)
 
