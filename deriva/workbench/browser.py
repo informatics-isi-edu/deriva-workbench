@@ -12,17 +12,18 @@ _fkeyColor = QColor(153, 51, 102)
 
 
 class _SchemaBrowserItem(QStandardItem):
-    def __init__(self, txt='', data=None, font_size=12, set_bold=False, color=QColor(0, 0, 0)):
+    def __init__(self, txt='', data=None, font_size=12, set_bold=False, color=None):
         super().__init__()
 
         fnt = QFont('Open Sans', font_size)
         fnt.setBold(set_bold)
 
         self.setEditable(False)
-        self.setForeground(color)
         self.setFont(fnt)
         self.setText(txt)
         self.setData(data, Qt.UserRole)
+        if color:
+            self.setForeground(color)
 
 
 class SchemaBrowser(QWidget):

@@ -484,12 +484,12 @@ class _WorkbenchWindowUI(object):
         # Log Widget
         self.logTextBrowser = QPlainTextEditLogger(centralWidget)
         self.logTextBrowser.widget.setObjectName("logTextBrowser")
+        self.logTextBrowser.widget.setBackgroundVisible(False)
         self.logTextBrowser.widget.setStyleSheet(
             """
             QPlainTextEdit {
                     border: 1px solid grey;
                     border-radius: 3px;
-                    background-color: white;
             }
             """)
         self.splitter.addWidget(self.logTextBrowser.widget)
