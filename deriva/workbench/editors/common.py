@@ -2,7 +2,6 @@
 """
 from collections.abc import Callable
 import logging
-from typing import Any
 from PyQt5.QtWidgets import QVBoxLayout, QWidget, QCheckBox, QListWidget, QListWidgetItem, QComboBox, QLineEdit
 from PyQt5.QtGui import QValidator
 from PyQt5.QtCore import Qt, pyqtSlot, pyqtSignal
