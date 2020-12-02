@@ -164,35 +164,6 @@ class SomeOrAllSelectorWidget(QWidget):
         self.valueChanged.emit()
 
 
-class TemplateEngineWidget(QComboBox):
-    """Widget for the `template_engine` property.
-    """
-
-    __choices__ = ['handlebars', 'mustache']
-    valueChanged = pyqtSignal()
-
-    def __init__(self, annotation: dict, parent: QWidget = None):
-        super(TemplateEngineWidget, self).__init__(parent=parent)
-        self._annotation = annotation
-        self.addItems([''] + self.__choices__)
-        self.setPlaceholderText('Select a template engine')
-        self.setCurrentIndex(
-            self.findText(self._annotation.get('template_engine', '')) or -1
-        )
-        self.currentIndexChanged.connect(self._on_index_changed)
-
-    @pyqtSlot()
-    def _on_index_changed(self):
-        template_engine = self.currentText()
-        set_value_or_del_key(
-            self._annotation,
-            template_engine in self.__choices__,
-            'template_engine',
-            template_engine
-        )
-        self.valueChanged.emit()
-
-
 class SimpleTextPropertyWidget(QLineEdit):
     """A simple property editor widget extending QLineEdit.
     """
@@ -206,6 +177,13 @@ class SimpleTextPropertyWidget(QLineEdit):
             placeholder: str = '',
             validator: QValidator = None,
             parent: QWidget = None):
+        """Initialize the widget.
+
+        :param key: annotation key
+        :param body: annotation body (container)
+        :param placeholder: text to display when no value set in the widget
+        :param parent: parent widget
+        """
         super(SimpleTextPropertyWidget, self).__init__(parent=parent)
         self.key, self.body = key, body
         self.setText(self.body.get(key, ''))
@@ -264,3 +242,65 @@ class SimpleBooleanPropertyWidget(QCheckBox):
             value
         )
         self.valueChanged.emit()
+
+
+class SimpleComboBoxPropertyWidget(QComboBox):
+    """A simple combobox property editor widget.
+    """
+
+    valueChanged = pyqtSignal()
+
+    def __init__(
+            self,
+            key: str,
+            body: {},
+            choices: [str],
+            placeholder: str = '',
+            parent: QWidget = None):
+        """Initialize the widget.
+
+        Limitation: this widget treats `''` as a non-selectable value.
+
+        :param key: annotation key
+        :param body: annotation body (container)
+        :param choices: list of values that may be selected
+        :param placeholder: text to display when no value is selected
+        :param parent: parent widget
+        """
+        super(SimpleComboBoxPropertyWidget, self).__init__(parent=parent)
+        self.key, self.body = key, body
+        self.addItems([''] + choices)
+        self.setPlaceholderText(placeholder)
+        self.setCurrentIndex(
+            self.findText(self.body.get(self.key, '')) or -1
+        )
+        self.currentIndexChanged.connect(self._on_index_changed)
+
+    @pyqtSlot()
+    def _on_index_changed(self):
+        value = self.currentText()
+        set_value_or_del_key(
+            self.body,
+            bool(value),
+            self.key,
+            value
+        )
+        self.valueChanged.emit()
+
+
+class TemplateEngineWidget(SimpleComboBoxPropertyWidget):
+    """Widget for the `template_engine` property.
+    """
+
+    def __init__(self, body: {}, parent: QWidget = None):
+        """Initialize the widget.
+
+        :param body: annotation body (container)
+        :param parent: parent widget
+        """
+        super(TemplateEngineWidget, self).__init__(
+            'template_engine',
+            body,
+            ['handlebars', 'mustache'],
+            'Select a template engine',
+            parent=parent)

@@ -18,7 +18,7 @@ class TableDisplayContextsEditor(TabbedContextsWidget):
     body: dict
 
     def __init__(self, table: _erm.Table, parent: QWidget = None):
-        """Initialize visible sources editor.
+        """Initialize widget.
         """
         super(TableDisplayContextsEditor, self).__init__(parent=parent)
         assert isinstance(table, _erm.Table)

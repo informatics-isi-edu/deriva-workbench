@@ -1,25 +1,22 @@
 """Schema editor widget that launches resource-specific editors.
 """
-from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget, QPlainTextEdit
+from PyQt5.QtWidgets import QVBoxLayout, QWidget, QGroupBox
 from deriva.core import tag
 from .editors import JSONEditor, AnnotationEditor, VisibleSourcesEditor, SourceDefinitionsEditor, CitationEditor, \
-    TableDisplayContextsEditor
+    TableDisplayContextsEditor, ForeignKeyAnnotationEditor
 
 
-class SchemaEditor(QWidget):
+class SchemaEditor(QGroupBox):
     """Schema editor widget.
 
     This serves as a container for a range of resource-specific editor.
     """
 
-    def __init__(self):
-        super(SchemaEditor, self).__init__()
-        self.editor = QPlainTextEdit()
-        self.editor.setEnabled(False)
+    def __init__(self, parent: QWidget = None):
+        super(SchemaEditor, self).__init__('Schema Editor', parent=parent)
+        self.editor = None
         vlayout = QVBoxLayout()
-        vlayout.setContentsMargins(0, 0, 0, 0)
-        vlayout.addWidget(QLabel('Schema Editor'))
-        vlayout.addWidget(self.editor)
+        vlayout.setContentsMargins(3, 3, 3, 3)
         self.setAutoFillBackground(True)
         self.setLayout(vlayout)
 
@@ -29,10 +26,12 @@ class SchemaEditor(QWidget):
 
     @data.setter
     def data(self, value):
+        """Sets the object to be edited.
+        """
 
+        # instantiate the appropriate editor for the type of value
         if value is None:
-            widget = QPlainTextEdit()
-            widget.setEnabled(False)
+            widget = None
         elif hasattr(value, 'prejson'):
             widget = JSONEditor(value.prejson())
         elif value.get('tag') == tag.visible_columns or value.get('tag') == tag.visible_foreign_keys:
@@ -47,8 +46,19 @@ class SchemaEditor(QWidget):
         elif value.get('tag') == tag.table_display:
             assert value and isinstance(value, dict) and 'parent' in value
             widget = TableDisplayContextsEditor(value['parent'])
+        elif value.get('tag') == tag.foreign_key:
+            assert value and isinstance(value, dict) and 'parent' in value
+            widget = ForeignKeyAnnotationEditor(value['parent'])
         else:
             widget = AnnotationEditor(value)
 
-        self.layout().replaceWidget(self.editor, widget)
+        # replace existing editor instance
+        if self.editor:
+            self.layout().replaceWidget(self.editor, widget)
+            self.editor.hide()
+            del self.editor
+        else:
+            self.layout().addWidget(widget)
+
+        # record the editor
         self.editor = widget
