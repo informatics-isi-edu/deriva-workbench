@@ -65,10 +65,10 @@ class SubsetSelectionWidget(QListWidget):
     """Widget for selecting a subset of values from a list of available options.
     """
 
-    selected_values: list[Any]
+    selected_values: []
     valueChanged = pyqtSignal()
 
-    def __init__(self, selected_values: list[Any], all_values: list[Any], to_string: Callable[[Any], str] = None, parent: QWidget = None):
+    def __init__(self, selected_values: [], all_values: [], to_string: Callable[[Any], str] = None, parent: QWidget = None):
         """Initialize the widget.
 
         :param selected_values: list of selected values
@@ -106,10 +106,10 @@ class SomeOrAllSelectorWidget(QWidget):
     """Widget for selecting all or a subset of available options.
     """
 
-    selected_values: bool or list[Any]
+    selected_values: bool or []
     valueChanged = pyqtSignal()
 
-    def __init__(self, selected_values: bool or list[Any], all_values: list[Any], to_string: Callable[[Any], str] = None, parent: QWidget = None):
+    def __init__(self, selected_values: bool or [], all_values: [], to_string: Callable[[Any], str] = None, parent: QWidget = None):
         """Initialize the widget.
 
         :param selected_values: list of selected values
