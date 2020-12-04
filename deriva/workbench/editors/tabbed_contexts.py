@@ -1,6 +1,8 @@
 """Base widget for tabbed contexts editors, intended for internal use only.
 """
 import logging
+from typing import Any, Callable
+
 from PyQt5.QtWidgets import QWidget, QTabWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QLineEdit, QMessageBox
 from PyQt5.QtCore import pyqtSlot, pyqtSignal
 
@@ -34,7 +36,7 @@ class TabbedContextsWidget(QWidget):
         createTab = QWidget(parent=self)
         createTab.setLayout(QHBoxLayout())
         # ...label
-        createTab.layout().addWidget(QLabel('Create Context Entry:'))
+        createTab.layout().addWidget(QLabel('Context Name:'))
         # ...line edit
         self._contextNameLineEdit = QLineEdit()
         self._contextNameLineEdit.setPlaceholderText('Enter a unique context name')
@@ -47,7 +49,7 @@ class TabbedContextsWidget(QWidget):
         self._createButton.clicked.connect(self._on_contextName_createEvent)
         createTab.layout().addWidget(self._createButton)
         createTab.setAutoFillBackground(True)
-        self._tabs.addTab(createTab, '<create>')
+        self._tabs.addTab(createTab, '<add>')
 
     @pyqtSlot()
     def _on_contextName_textChanged(self):
@@ -102,6 +104,11 @@ class TabbedContextsWidget(QWidget):
         except ValueError:
             logger.error('Context "%s" not found' % context_name)
 
+    def setActiveContextByIndex(self, index: int) -> None:
+        """Sets the active context tab by simple numeric index.
+        """
+        self._tabs.setCurrentIndex(index)
+
     def addContext(self, context_widget: QWidget, context_name: str) -> None:
         """Adds a context widget and label.
 
@@ -122,3 +129,77 @@ class TabbedContextsWidget(QWidget):
             self._tabs.removeTab(index)
         except ValueError:
             logger.error('Context "%s" not found' % context)
+
+
+class EasyTabbedContextsWidget(TabbedContextsWidget):
+    """Easier tabbed contexts widget.
+
+    This widget is useful for contextualized properties of annotations. When all contexts are removed it will purge the
+    property from the given annotation body.
+
+    The 'valueChanged' signal only indicates that a context has been added or removed. It does not roll up changes made
+    by the context widget which should be established in your own 'create_context_widget_fn' function.
+    """
+
+    valueChanged = pyqtSignal()
+
+    def __init__(self,
+                 key: str,
+                 body: dict,
+                 default_context_value: Any,
+                 create_context_widget_fn: Callable,
+                 parent: QWidget = None):
+        """Initialize the widget.
+
+        :param key: the key for the annotation property in the body
+        :param body: the body of the annotation property
+        :param default_context_value: the default value for new contexts
+        :param create_context_widget_fn: function to create a new widget to manage a context
+        :param parent: this widget's parent
+        """
+        super(EasyTabbedContextsWidget, self).__init__(parent=parent)
+        self.key, self.body = key, body
+        self.default_context_value = default_context_value
+        self.create_context_widget_fn = create_context_widget_fn
+
+        # connect the create/remove slots
+        self.createContextRequested.connect(self._on_createContextRequested)
+        self.removeContextRequested.connect(self._on_removeContextRequested)
+
+        # create widgets for contexts
+        for context in self.body.get(key, {}):
+            self.addContext(
+                self.create_context_widget_fn(context),
+                context
+            )
+
+        # set first context active
+        if self._tabs.count():
+            self.setActiveContextByIndex(0)
+
+    @pyqtSlot(str)
+    def _on_createContextRequested(self, context):
+        """Handles the 'createContextRequested' signal.
+        """
+        # create new context entry
+        self.body[self.key] = self.body.get(self.key, {})
+        self.body[self.key][context] = self.default_context_value
+
+        # create and add new context editor
+        self.addContext(
+            self.create_context_widget_fn(context),
+            context
+        )
+        # emit
+        self.valueChanged.emit()
+
+    @pyqtSlot(str)
+    def _on_removeContextRequested(self, context):
+        """Handles the 'removeContextRequested' signal.
+        """
+        del self.body[self.key][context]
+        if not self.body[self.key]:
+            del self.body[self.key]
+        self.removeContext(context)
+        # emit
+        self.valueChanged.emit()

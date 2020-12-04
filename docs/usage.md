@@ -73,8 +73,9 @@ underlying annotation if the text entered can be parsed without errors.
 ### 5. Editing annotations (graphically)
 
 The workbench currently provides enhanced support for a few key annotations, including 
-`visible-columns`, `visible-foreign-keys`, `source-definitions`, `table-display`, and 
-`citation`. For all other annotations, the workbench will fall back to the JSON editor.
+`visible-columns`, `visible-foreign-keys`, `source-definitions`, `table-display`, 
+`citation`, and `display`. For all other annotations, the workbench will fall back to the 
+JSON editor.
 
 #### a. Editing `visible-columns`
 
@@ -145,10 +146,17 @@ the annotation guide.
 
 #### e. Editing `citation`
 
-The `citation` editor allows entry of markdown patterns, seleciton of template engine, and the 
+The `citation` editor allows entry of markdown patterns, selection of template engine, and the 
 optional sources to "Wait For" at bottom.
 
 ![Citation](images/citation.png)
+
+#### f. Editing `display`
+
+The `display` editor allows entry of display names, display modifiers, comments, null handling
+directives, and foriegn key presentation instructions.
+
+![Display](images/display.png)
 
 ### 6. Updating catalog annotations
 

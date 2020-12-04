@@ -2,7 +2,9 @@
 """
 from collections.abc import Callable
 import logging
-from PyQt5.QtWidgets import QVBoxLayout, QWidget, QCheckBox, QListWidget, QListWidgetItem, QComboBox, QLineEdit
+from typing import Any
+from PyQt5.QtWidgets import QVBoxLayout, QWidget, QCheckBox, QListWidget, QListWidgetItem, QComboBox, QLineEdit, \
+    QButtonGroup, QBoxLayout, QHBoxLayout, QRadioButton
 from PyQt5.QtGui import QValidator
 from PyQt5.QtCore import Qt, pyqtSlot, pyqtSignal
 
@@ -167,6 +169,7 @@ class SimpleTextPropertyWidget(QLineEdit):
     """A simple property editor widget extending QLineEdit.
     """
 
+    value: str
     valueChanged = pyqtSignal()
 
     def __init__(
@@ -181,11 +184,14 @@ class SimpleTextPropertyWidget(QLineEdit):
         :param key: annotation key
         :param body: annotation body (container)
         :param placeholder: text to display when no value set in the widget
+        :param validator: optional validator for the line editor
         :param parent: parent widget
         """
         super(SimpleTextPropertyWidget, self).__init__(parent=parent)
         self.key, self.body = key, body
-        self.setText(self.body.get(key, ''))
+        self.value = self.body.get(key, '')
+        if isinstance(self.value, str):
+            self.setText(self.value)
         self.setPlaceholderText(placeholder)
         self.textChanged.connect(self._on_textChanged)
         if validator:
@@ -195,12 +201,12 @@ class SimpleTextPropertyWidget(QLineEdit):
     def _on_textChanged(self):
         """Handles textChanged events.
         """
-        value = self.text()
+        self.value = self.text()
         set_value_or_del_key(
             self.body,
-            bool(value),
+            bool(self.value),
             self.key,
-            value
+            self.value
         )
         self.valueChanged.emit()
 
@@ -209,6 +215,7 @@ class SimpleBooleanPropertyWidget(QCheckBox):
     """A simple boolean property editor widget.
     """
 
+    value: bool
     valueChanged = pyqtSignal()
 
     def __init__(
@@ -216,29 +223,32 @@ class SimpleBooleanPropertyWidget(QCheckBox):
             text: str,
             key: str,
             body: {},
+            truth_fn: Callable = bool,
             parent: QWidget = None):
         """Initialize the widget
 
         :param text: checkbox text label
         :param key: annotation key
         :param body: annotation body (container)
+        :param truth_fn: function applied to value to determine whether it should be set or dropped from body
         :param parent: parent widget
         """
         super(SimpleBooleanPropertyWidget, self).__init__(text, parent=parent)
-        self.key, self.body = key, body
-        self.setChecked(self.body.get(key, False))
+        self.key, self.body, self._truth_fn = key, body, truth_fn
+        self.value = self.body.get(key, False)
+        self.setChecked(self.value)
         self.clicked.connect(self._on_clicked)
 
     @pyqtSlot()
     def _on_clicked(self):
         """Handles clicked events.
         """
-        value = self.isChecked()
+        self.value = self.isChecked()
         set_value_or_del_key(
             self.body,
-            bool(value),
+            self._truth_fn(self.value),
             self.key,
-            value
+            self.value
         )
         self.valueChanged.emit()
 
@@ -247,6 +257,7 @@ class SimpleComboBoxPropertyWidget(QComboBox):
     """A simple combobox property editor widget.
     """
 
+    value: str
     valueChanged = pyqtSignal()
 
     def __init__(
@@ -268,21 +279,22 @@ class SimpleComboBoxPropertyWidget(QComboBox):
         """
         super(SimpleComboBoxPropertyWidget, self).__init__(parent=parent)
         self.key, self.body = key, body
+        self.value = self.body.get(self.key, '')
         self.addItems([''] + choices)
         self.setPlaceholderText(placeholder)
         self.setCurrentIndex(
-            self.findText(self.body.get(self.key, '')) or -1
+            self.findText(self.value) or -1
         )
         self.currentIndexChanged.connect(self._on_index_changed)
 
     @pyqtSlot()
     def _on_index_changed(self):
-        value = self.currentText()
+        self.value = self.currentText()
         set_value_or_del_key(
             self.body,
-            bool(value),
+            bool(self.value),
             self.key,
-            value
+            self.value
         )
         self.valueChanged.emit()
 
@@ -303,3 +315,89 @@ class TemplateEngineWidget(SimpleComboBoxPropertyWidget):
             ['handlebars', 'mustache'],
             'Select a template engine',
             parent=parent)
+
+
+class MultipleChoicePropertyWidget(QWidget):
+    """A multiple choice property editor widget.
+    """
+
+    value: Any
+    valueChanged = pyqtSignal()
+
+    def __init__(
+            self,
+            key: str,
+            body: {},
+            choices: dict,
+            other_key: str = 'Other',
+            other_widget: QWidget = None,
+            layout: QBoxLayout = None,
+            parent: QWidget = None):
+        """Initialize the widget.
+
+        Limitation: 'other_widget' must have a 'value' attribute.
+
+        :param key: annotation key
+        :param body: annotation body (container)
+        :param choices: key-value pairs of choices
+        :param other_key: the label and key for the 'other' selection; must not collide with keys in 'choices'
+        :param other_widget: another widget for handling 'other'
+        :param layout: the desired layout of the child widgets (defaults to QHBoxLayout)
+        :param parent: parent widget
+        """
+        super(MultipleChoicePropertyWidget, self).__init__(parent=parent)
+        self.key, self.body, self.choices = key, body, choices
+        self.other_key, self.other_widget = other_key, other_widget
+        self.value = self.body[key]
+
+        # apply layout
+        layout = layout if layout is not None else QHBoxLayout()
+        layout.setParent(self)
+        self.setLayout(layout)
+
+        # button group
+        self.buttonGroup = QButtonGroup(self)
+        self.buttonGroup.buttonClicked.connect(self._on_buttonGroup_clicked)
+
+        # choices
+        for k, v in choices.items():
+            rbutton = QRadioButton(k, parent=self)
+            self.buttonGroup.addButton(rbutton)
+            layout.addWidget(rbutton)
+            if self.value == v:  # test if this button's value is found
+                rbutton.setChecked(True)
+
+        # other
+        if other_widget:
+            assert hasattr(other_widget, 'value'), "'other_widget' must have 'value' attribute"
+            rbutton = QRadioButton(other_key, parent=self)
+            self.buttonGroup.addButton(rbutton)
+            layout.addWidget(rbutton)
+            layout.addWidget(other_widget)
+            if self.value and self.value not in choices.values():  # test if 'other' value found
+                rbutton.setChecked(True)
+            else:
+                other_widget.setEnabled(False)
+
+    def _on_buttonGroup_clicked(self):
+        """Handles buttonGroup click even.
+        """
+        # ...get currently selected choice
+        choice_key = self.buttonGroup.checkedButton().text()
+        # ...get value from control state
+        if choice_key == self.other_key:
+            self.value = self.other_widget.value
+            self.other_widget.setEnabled(True)
+        else:
+            self.value = self.choices[choice_key]
+            if self.other_widget:
+                self.other_widget.setEnabled(False)
+        # ...set value in annotation
+        set_value_or_del_key(
+            self.body,
+            True,
+            self.key,
+            self.value
+        )
+        # ...emit signal
+        self.valueChanged.emit()
