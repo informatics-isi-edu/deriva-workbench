@@ -86,10 +86,8 @@ class TableDisplayEditor(QWidget):
         rowOrderGroup = QGroupBox('Row Order', parent=self)
         rowOrderGroup.setLayout(QVBoxLayout(rowOrderGroup))
         rowOrderGroup.layout().setContentsMargins(0, 0, 0, 0)
-        rowOrderGroup.layout().addWidget(SortKeysWidget('row_order',
-                                                        self.body,
-                                                        [c.name for c in self.table.columns],
-                                                        parent=rowOrderGroup))
+        rowOrderGroup.layout().addWidget(
+            SortKeysWidget('row_order', self.body, [c.name for c in self.table.columns], parent=rowOrderGroup))
         layout.addWidget(rowOrderGroup)
 
         # markdown patterns

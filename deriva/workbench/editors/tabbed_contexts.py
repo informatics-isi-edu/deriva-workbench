@@ -1,8 +1,7 @@
 """Base widget for tabbed contexts editors, intended for internal use only.
 """
 import logging
-from typing import Any, Callable
-
+from typing import Callable
 from PyQt5.QtWidgets import QWidget, QTabWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QLineEdit, QMessageBox
 from PyQt5.QtCore import pyqtSlot, pyqtSignal
 
@@ -146,20 +145,22 @@ class EasyTabbedContextsWidget(TabbedContextsWidget):
     def __init__(self,
                  key: str,
                  body: dict,
-                 default_context_value: Any,
+                 create_context_value: Callable,
                  create_context_widget_fn: Callable,
                  parent: QWidget = None):
         """Initialize the widget.
 
         :param key: the key for the annotation property in the body
         :param body: the body of the annotation property
-        :param default_context_value: the default value for new contexts
-        :param create_context_widget_fn: function to create a new widget to manage a context
+        :param create_context_value: function to create an initial value for new contexts; it must accept a context
+                name string, and it may return Any type of value.
+        :param create_context_widget_fn: function to create an editor widget to manage a context; it must accept a
+                context name string and an optional parent object, and it may return an instance of QWidget.
         :param parent: this widget's parent
         """
         super(EasyTabbedContextsWidget, self).__init__(parent=parent)
         self.key, self.body = key, body
-        self.default_context_value = default_context_value
+        self.create_context_value = create_context_value
         self.create_context_widget_fn = create_context_widget_fn
 
         # connect the create/remove slots
@@ -169,7 +170,7 @@ class EasyTabbedContextsWidget(TabbedContextsWidget):
         # create widgets for contexts
         for context in self.body.get(key, {}):
             self.addContext(
-                self.create_context_widget_fn(context),
+                self.create_context_widget_fn(context, parent=self),
                 context
             )
 
@@ -183,11 +184,11 @@ class EasyTabbedContextsWidget(TabbedContextsWidget):
         """
         # create new context entry
         self.body[self.key] = self.body.get(self.key, {})
-        self.body[self.key][context] = self.default_context_value
+        self.body[self.key][context] = self.create_context_value(context)
 
         # create and add new context editor
         self.addContext(
-            self.create_context_widget_fn(context),
+            self.create_context_widget_fn(context, parent=self),
             context
         )
         # emit

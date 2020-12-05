@@ -6,7 +6,7 @@ from typing import Any
 from PyQt5.QtWidgets import QVBoxLayout, QWidget, QCheckBox, QListWidget, QListWidgetItem, QComboBox, QLineEdit, \
     QButtonGroup, QBoxLayout, QHBoxLayout, QRadioButton
 from PyQt5.QtGui import QValidator
-from PyQt5.QtCore import Qt, pyqtSlot, pyqtSignal
+from PyQt5.QtCore import Qt, QObject, pyqtSlot, pyqtSignal
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +178,7 @@ class SimpleTextPropertyWidget(QLineEdit):
             body: {},
             placeholder: str = '',
             validator: QValidator = None,
+            truth_fn: Callable = bool,
             parent: QWidget = None):
         """Initialize the widget.
 
@@ -185,10 +186,12 @@ class SimpleTextPropertyWidget(QLineEdit):
         :param body: annotation body (container)
         :param placeholder: text to display when no value set in the widget
         :param validator: optional validator for the line editor
+        :param truth_fn: function applied to value to determine whether it should be set or dropped from body
         :param parent: parent widget
         """
         super(SimpleTextPropertyWidget, self).__init__(parent=parent)
         self.key, self.body = key, body
+        self._truth_fn = truth_fn
         self.value = self.body.get(key, '')
         if isinstance(self.value, str):
             self.setText(self.value)
@@ -204,7 +207,7 @@ class SimpleTextPropertyWidget(QLineEdit):
         self.value = self.text()
         set_value_or_del_key(
             self.body,
-            bool(self.value),
+            self._truth_fn(self.value),
             self.key,
             self.value
         )
@@ -266,6 +269,7 @@ class SimpleComboBoxPropertyWidget(QComboBox):
             body: {},
             choices: [str],
             placeholder: str = '',
+            truth_fn: Callable = bool,
             parent: QWidget = None):
         """Initialize the widget.
 
@@ -275,10 +279,12 @@ class SimpleComboBoxPropertyWidget(QComboBox):
         :param body: annotation body (container)
         :param choices: list of values that may be selected
         :param placeholder: text to display when no value is selected
+        :param truth_fn: function applied to value to determine whether it should be set or dropped from body
         :param parent: parent widget
         """
         super(SimpleComboBoxPropertyWidget, self).__init__(parent=parent)
         self.key, self.body = key, body
+        self._truth_fn = truth_fn
         self.value = self.body.get(self.key, '')
         self.addItems([''] + choices)
         self.setPlaceholderText(placeholder)
@@ -292,7 +298,7 @@ class SimpleComboBoxPropertyWidget(QComboBox):
         self.value = self.currentText()
         set_value_or_del_key(
             self.body,
-            bool(self.value),
+            self._truth_fn(self.value),
             self.key,
             self.value
         )
@@ -332,6 +338,7 @@ class MultipleChoicePropertyWidget(QWidget):
             other_key: str = 'Other',
             other_widget: QWidget = None,
             layout: QBoxLayout = None,
+            truth_fn: Callable = lambda x: x is not None,
             parent: QWidget = None):
         """Initialize the widget.
 
@@ -343,12 +350,14 @@ class MultipleChoicePropertyWidget(QWidget):
         :param other_key: the label and key for the 'other' selection; must not collide with keys in 'choices'
         :param other_widget: another widget for handling 'other'
         :param layout: the desired layout of the child widgets (defaults to QHBoxLayout)
+        :param truth_fn: function applied to value to determine whether it should be set or dropped from body
         :param parent: parent widget
         """
         super(MultipleChoicePropertyWidget, self).__init__(parent=parent)
         self.key, self.body, self.choices = key, body, choices
         self.other_key, self.other_widget = other_key, other_widget
-        self.value = self.body[key]
+        self._truth_fn = truth_fn
+        self.value = self.body.get(key)
 
         # apply layout
         layout = layout if layout is not None else QHBoxLayout()
@@ -379,6 +388,7 @@ class MultipleChoicePropertyWidget(QWidget):
             else:
                 other_widget.setEnabled(False)
 
+    @pyqtSlot()
     def _on_buttonGroup_clicked(self):
         """Handles buttonGroup click even.
         """
@@ -395,9 +405,63 @@ class MultipleChoicePropertyWidget(QWidget):
         # ...set value in annotation
         set_value_or_del_key(
             self.body,
-            True,
+            self._truth_fn(self.value),
             self.key,
             self.value
         )
         # ...emit signal
         self.valueChanged.emit()
+
+
+class SimpleNestedPropertyManager(QObject):
+    """A simple manager for nested properties.
+
+    In an annotation `body`, such as:
+    ```
+    {...
+        "foo": { "bar": 1, "baz": 2 }
+    ...}
+    ```
+    Here `foo` is the name of the nested property container, while `bar` and `baz` are its nested properties. The
+    container will listen for signals from components and if `foo` is empty (`{}`) it will remove `foo` from the
+    parent annotation `body`. If `foo` is non-empty it will add itself into the annotation `body`.
+
+    In order to manage the nested properties passed to edit widgets, the manager must be instantiated first, and its
+    `value` attribute should be passed to other edit widgets as the container for the specific nested property that
+    they manage.
+
+    ```
+    manager = SimpleNestedPropertyManager('foo', annotations, parent=fooWidget)
+    barWidget = SimpleWidget('bar', manager.value, ...)
+    barWidget.valueChanged.connect(mgr.onValueChanged)
+    ```
+
+    *Note*: This object is not a display widget.
+    """
+
+    def __init__(self, key: str, body: dict, truth_fn: Callable = bool, parent: QObject = None):
+        """Initialize the container.
+
+        :param key: the key of the nested property container.
+        :param body: the annotation body, in which `key` _may_ be found
+        :param truth_fn: function applied to value to determine whether it should be set or dropped from body
+        :param parent: the parent object
+        """
+        super(SimpleNestedPropertyManager, self).__init__(parent=parent)
+        self.key, self.body = key, body
+        self._truth_fn = truth_fn
+        # ...defensively get the value, ensuring that it is a dictionary
+        self.value = self.body.get(self.key)
+        if not isinstance(self.value, dict):
+            self.value = {}
+
+    @pyqtSlot()
+    def onValueChanged(self):
+        """Listens for changes and sets or removes nested property if it satisfies truth function.
+        """
+        set_value_or_del_key(
+            self.body,
+            self._truth_fn(self.value),
+            self.key,
+            self.value
+        )

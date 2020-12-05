@@ -73,12 +73,12 @@ class DisplayAnnotationEditor(QWidget):
 
         # ...convert deprecated values
         if isinstance(self.body.get(self.__comment__), str):
-            logger.warning('Deprecated "comment" found in "%s" annotation. Converting to contextualized format with '
-                           'current value in "*" context.' % tag.display)
+            logger.warning('Deprecated "%s" value in "%s" annotation. Converting to contextualized format with '
+                           'current value in "*" context.' % (self.__comment__, tag.display))
             self.body[self.__comment__] = {"*": self.body[self.__comment__]}
 
         # ...function to create editor widget
-        def create_comment_editor_widget(context: str) -> QWidget:
+        def create_comment_editor_widget(context: str, parent: QWidget = self) -> QWidget:
             """Returns a new comment editor widget for the given context.
             """
             return MultipleChoicePropertyWidget(
@@ -90,19 +90,17 @@ class DisplayAnnotationEditor(QWidget):
                 other_key='Comment',
                 other_widget=SimpleTextPropertyWidget(context, self.body[self.__comment__],
                                                       placeholder='Enter comment text',
-                                                      parent=self),
+                                                      parent=parent),
                 layout=QVBoxLayout(),
                 parent=self
             )
 
         # ...add the tabbed context widget
-        comment = EasyTabbedContextsWidget(
-            self.__comment__,
-            self.body,
-            False,
-            create_comment_editor_widget,
-            parent=self
-        )
+        comment = EasyTabbedContextsWidget(self.__comment__,
+                                           self.body,
+                                           lambda context: False,
+                                           create_comment_editor_widget,
+                                           parent=self)
         layout.addRow("Comment", comment)
 
         #
@@ -112,10 +110,10 @@ class DisplayAnnotationEditor(QWidget):
         column_comment_display = 'column_comment_display'
 
         # ...function to create editor widget
-        def create_comment_display_widget(context: str) -> QWidget:
+        def create_comment_display_widget(context: str, parent: QWidget = self) -> QWidget:
             """Returns a new comment_display editor.
             """
-            widget = QWidget(parent=self)
+            widget = QWidget(parent=parent)
             form = QFormLayout(widget)
             widget.setLayout(form)
 
@@ -138,13 +136,11 @@ class DisplayAnnotationEditor(QWidget):
             return widget
 
         # ...add the tabbed context widget
-        commentDisplay = EasyTabbedContextsWidget(
-            self.__comment_display__,
-            self.body,
-            {},
-            create_comment_display_widget,
-            parent=self
-        )
+        commentDisplay = EasyTabbedContextsWidget(self.__comment_display__,
+                                                  self.body,
+                                                  lambda context: {},
+                                                  create_comment_display_widget,
+                                                  parent=self)
         layout.addRow("Comment Display", commentDisplay)
 
         #
@@ -152,7 +148,7 @@ class DisplayAnnotationEditor(QWidget):
         #
 
         # ...function to create editor widget
-        def create_shownull_editor_widget(context: str) -> QWidget:
+        def create_shownull_editor_widget(context: str, parent: QWidget = self) -> QWidget:
             """Returns a new show_null editor widget for the given context.
             """
             return MultipleChoicePropertyWidget(
@@ -165,18 +161,16 @@ class DisplayAnnotationEditor(QWidget):
                 other_key='Use other indicator for NULLs',
                 other_widget=SimpleTextPropertyWidget(context, self.body[self.__show_null__],
                                                       placeholder='Enter text to use as indicator of NULL value',
-                                                      parent=self),
-                parent=self
+                                                      parent=parent),
+                parent=parent
             )
 
         # ...add the tabbed context widget
-        showNull = EasyTabbedContextsWidget(
-            self.__show_null__,
-            self.body,
-            True,
-            create_shownull_editor_widget,
-            parent=self
-        )
+        showNull = EasyTabbedContextsWidget(self.__show_null__,
+                                            self.body,
+                                            lambda context: True,
+                                            create_shownull_editor_widget,
+                                            parent=self)
         layout.addRow("Show Nulls", showNull)
 
         #
@@ -184,7 +178,7 @@ class DisplayAnnotationEditor(QWidget):
         #
 
         # ...function to create editor widget
-        def create_show_foreign_key_link_widget(context: str) -> QWidget:
+        def create_show_foreign_key_link_widget(context: str, parent: QWidget = self) -> QWidget:
             """Returns a new show_foreign_key_link editor.
             """
             return MultipleChoicePropertyWidget(
@@ -195,15 +189,13 @@ class DisplayAnnotationEditor(QWidget):
                     'Present the foreign key values without adding extra links': False
                 },
                 layout=QVBoxLayout(),
-                parent=self
+                parent=parent
             )
 
         # ...add the tabbed context widget
-        fkLink = EasyTabbedContextsWidget(
-            self.__show_foreign_key_link__,
-            self.body,
-            True,
-            create_show_foreign_key_link_widget,
-            parent=self
-        )
+        fkLink = EasyTabbedContextsWidget(self.__show_foreign_key_link__,
+                                          self.body,
+                                          lambda context: True,
+                                          create_show_foreign_key_link_widget,
+                                          parent=self)
         layout.addRow("Show FK Link", fkLink)

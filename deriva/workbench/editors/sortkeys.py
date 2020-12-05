@@ -1,6 +1,6 @@
 """Common components for managing various forms of sort keys in annotations.
 """
-from PyQt5.QtCore import QAbstractTableModel, Qt, QVariant, pyqtSlot
+from PyQt5.QtCore import QAbstractTableModel, Qt, QVariant, pyqtSlot, pyqtSignal
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTableView, QHeaderView, QHBoxLayout, QComboBox, QCheckBox, \
     QPushButton
 
@@ -8,6 +8,9 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTableView, QHeaderView, QHBox
 class SortKeysWidget(QWidget):
     """Sort keys editor widget.
     """
+
+    value: list
+    valueChanged = pyqtSignal()
 
     class _TableModel(QAbstractTableModel):
         """Internal table model for a context.
@@ -34,18 +37,24 @@ class SortKeysWidget(QWidget):
                 return QVariant()
             return self.headers[section]
 
-    def __init__(self, key: str, annotations: dict, columns: list, parent: QWidget = None):
+    def __init__(self, key: str, body: dict, columns: list, parent: QWidget = None):
         """Initializes the row order widget.
 
         :param key: the key for the sortkeys annotation (e.g., 'row_order', 'column_order')
-        :param annotations: an object that may contain a `sortkeys` annotation.
+        :param body: an object that may contain a `sortkeys` annotation.
         :param columns: a list of columns names
         :param parent: the parent widget
         """
         super(SortKeysWidget, self).__init__(parent=parent)
         self.key = key
-        self.annotations = annotations
-        self.sortkeys = self.annotations.get(self.key, [])
+        self.body = body
+
+        # defensively get 'value' allowing for non-compliant types to be ignore, corrected lazily if changed
+        value = self.body.get(self.key)
+        if isinstance(value, list):
+            self.value = value
+        else:
+            self.value = []
 
         # layout
         layout = QVBoxLayout(self)
@@ -100,7 +109,7 @@ class SortKeysWidget(QWidget):
                 sortkey if isinstance(sortkey, str) else sortkey['column'],
                 bool(sortkey.get('descending', False)) if isinstance(sortkey, dict) else False
             )
-            for sortkey in self.sortkeys
+            for sortkey in self.value
         ]))
 
     @pyqtSlot()
@@ -114,24 +123,29 @@ class SortKeysWidget(QWidget):
             sortkey['descending'] = True
 
         # update annotation
-        self.sortkeys.append(sortkey)
-        if self.key not in self.annotations:
-            self.annotations[self.key] = self.sortkeys
+        self.value.append(sortkey)
+        self.body[self.key] = self.value  # overwrite prior value, in case it was non-compliant
 
         # refresh ui
         self._refresh()
+
+        # signal changes
+        self.valueChanged.emit()
 
     @pyqtSlot()
     def _on_popButton_clicked(self):
         """Handles pop event.
         """
-        if not self.sortkeys:
+        if not self.value:
             return
 
         # update annotation
-        del self.sortkeys[-1]
-        if not self.sortkeys and self.key in self.annotations:
-            del self.annotations[self.key]
+        del self.value[-1]
+        if not self.value and self.key in self.body:
+            del self.body[self.key]
 
         # refresh ui
         self._refresh()
+
+        # signal changes
+        self.valueChanged.emit()
