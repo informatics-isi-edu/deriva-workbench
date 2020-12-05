@@ -74,7 +74,7 @@ underlying annotation if the text entered can be parsed without errors.
 
 The workbench currently provides enhanced support for a few key annotations, including 
 `visible-columns`, `visible-foreign-keys`, `source-definitions`, `table-display`, 
-`citation`, and `display`. For all other annotations, the workbench will fall back to the 
+`citation`, `display`, and `foreign-key`. For all other annotations, the workbench will fall back to the 
 JSON editor.
 
 #### a. Editing `visible-columns`
@@ -157,6 +157,15 @@ The `display` editor allows entry of display names, display modifiers, comments,
 directives, and foriegn key presentation instructions.
 
 ![Display](images/display.png)
+
+#### g. Editing `foreign-key`
+
+The `foreign-key` annotation editor allows entry of _to_ and _from_ direction names and 
+comments, the `domain_filter` property, and the _contextualized_ `display` property that allows
+modiviation of the sorting and link display behavior. The editor will update the deprecated 
+`domain_filter_pattern` property to the current format.
+
+![Foreign Key Annotation Editor](images/foreign-key.png)
 
 ### 6. Updating catalog annotations
 
