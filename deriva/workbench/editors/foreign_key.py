@@ -1,7 +1,7 @@
 """Editor for the foreign-key annotation.
 """
 import logging
-from PyQt5.QtWidgets import QWidget, QFormLayout, QVBoxLayout, QGroupBox, QLabel, QHBoxLayout
+from PyQt5.QtWidgets import QWidget, QFormLayout, QVBoxLayout, QGroupBox, QHBoxLayout, QFrame
 from deriva.core import tag, ermrest_model as _erm
 from .common import SimpleTextPropertyWidget, SimpleComboBoxPropertyWidget, MultipleChoicePropertyWidget, \
     SimpleNestedPropertyManager
@@ -31,6 +31,12 @@ class ForeignKeyAnnotationEditor(QWidget):
         self.setLayout(layout)
         self.setAutoFillBackground(True)
 
+        # to-from container, for side-by-side display of to and from group boxes
+        to_from_ = QWidget(self)
+        to_from_.setLayout(QHBoxLayout(to_from_))
+        to_from_.layout().setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(to_from_)
+
         # to
         to_ = QGroupBox("To Direction", parent=self)
         to_.setLayout(QFormLayout(to_))
@@ -42,7 +48,7 @@ class ForeignKeyAnnotationEditor(QWidget):
             self.__comment_display_choices__,
             placeholder='Select a comment display mode'
         ))
-        layout.addWidget(to_)
+        to_from_.layout().addWidget(to_)
 
         # from
         from_ = QGroupBox("From Direction", parent=self)
@@ -55,7 +61,7 @@ class ForeignKeyAnnotationEditor(QWidget):
             self.__comment_display_choices__,
             placeholder='Select a comment display mode'
         ))
-        layout.addWidget(from_)
+        to_from_.layout().addWidget(from_)
 
         #
         # Domain Filter
@@ -125,8 +131,12 @@ class ForeignKeyAnnotationEditor(QWidget):
                 layout=QVBoxLayout(),
                 parent=container
             )
-            container.layout().addWidget(QLabel('<b>Sorting Behavior</b>'))
             container.layout().addWidget(columnOrder)
+
+            # ...separator
+            hline = QFrame(parent=container)
+            hline.setFrameStyle(QFrame.HLine | QFrame.Sunken)
+            container.layout().addWidget(hline)
 
             # ...show fk link widget
             fkLink = MultipleChoicePropertyWidget(
@@ -140,7 +150,6 @@ class ForeignKeyAnnotationEditor(QWidget):
                 layout=QVBoxLayout(),
                 parent=container
             )
-            container.layout().addWidget(QLabel('<b>Foreign Key Link Display</b>'))
             container.layout().addWidget(fkLink)
 
             return container
