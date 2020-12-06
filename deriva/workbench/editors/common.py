@@ -288,9 +288,8 @@ class SimpleComboBoxPropertyWidget(QComboBox):
         self.value = self.body.get(self.key, '')
         self.addItems([''] + choices)
         self.setPlaceholderText(placeholder)
-        self.setCurrentIndex(
-            self.findText(self.value) or -1
-        )
+        if isinstance(self.value, str):  # ignore non-str values
+            self.setCurrentIndex(self.findText(self.value) or -1)
         self.currentIndexChanged.connect(self._on_index_changed)
 
     @pyqtSlot()

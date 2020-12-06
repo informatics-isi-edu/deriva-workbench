@@ -3,7 +3,7 @@
 from PyQt5.QtWidgets import QVBoxLayout, QWidget, QGroupBox
 from deriva.core import tag
 from .editors import JSONEditor, AnnotationEditor, VisibleSourcesEditor, SourceDefinitionsEditor, CitationEditor, \
-    TableDisplayContextsEditor, ForeignKeyAnnotationEditor, DisplayAnnotationEditor
+    TableDisplayContextsEditor, ForeignKeyAnnotationEditor, DisplayAnnotationEditor, AssetAnnotationEditor
 
 
 class SchemaEditor(QGroupBox):
@@ -52,6 +52,9 @@ class SchemaEditor(QGroupBox):
         elif value.get('tag') == tag.display:
             assert value and isinstance(value, dict) and 'parent' in value
             widget = DisplayAnnotationEditor(value['parent'])
+        elif value.get('tag') == tag.asset:
+            assert value and isinstance(value, dict) and 'parent' in value
+            widget = AssetAnnotationEditor(value['parent'])
         else:
             widget = AnnotationEditor(value)
 

@@ -7,3 +7,4 @@ from .citation import CitationEditor
 from .table_display import TableDisplayContextsEditor
 from .foreign_key import ForeignKeyAnnotationEditor
 from .display import DisplayAnnotationEditor
+from .asset import AssetAnnotationEditor
