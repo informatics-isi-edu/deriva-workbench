@@ -18,11 +18,11 @@ class SortKeysWidget(CommonTableWidget):
         super(SortKeysWidget, self).__init__(
             key,
             body,
-            _SortKeyWidget(columns),
+            editor_widget=_SortKeyWidget(columns),
             headers_fn=lambda sortkeys: ['Column', 'Descending'],
             row_fn=lambda sortkey: (
                 sortkey if isinstance(sortkey, str) else sortkey['column'],
-                bool(sortkey.get('descending', False)) if isinstance(sortkey, dict) else False
+                sortkey.get('descending', False) if isinstance(sortkey, dict) else False
             ),
             truth_fn=bool,
             parent=parent)
