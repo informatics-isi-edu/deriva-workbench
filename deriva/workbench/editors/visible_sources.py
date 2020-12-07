@@ -1,14 +1,14 @@
-"""Visible-Sources annotation editor.
+"""Widgets for editing visible-sources annotations.
 """
 from copy import deepcopy
 import logging
-from PyQt5.QtWidgets import QLabel, QVBoxLayout, QFrame, QWidget, QTableView, QComboBox, QPushButton, QHBoxLayout, \
-    QDialog, QButtonGroup, QRadioButton, QDialogButtonBox
-from PyQt5.QtCore import QAbstractTableModel, QVariant, Qt, pyqtSlot
+from PyQt5.QtWidgets import QLabel, QVBoxLayout, QFrame, QWidget, QComboBox, QDialog, QButtonGroup, QRadioButton, QDialogButtonBox
+from PyQt5.QtCore import pyqtSlot
 from deriva.core import tag as _tag, ermrest_model as _erm
 from .common import constraint_name, source_path_to_str
 from .tabbed_contexts import TabbedContextsWidget
 from .pseudo_column import PseudoColumnEditWidget
+from .table import CommonTableWidget
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +20,12 @@ class VisibleSourcesEditor(TabbedContextsWidget):
     table: _erm.Table
     tag: str
 
-    def __init__(self, table, tag, parent: QWidget = None):
+    def __init__(self, table: _erm.Table, tag: str, parent: QWidget = None):
         """Initialize visible sources editor.
+
+        :param table: the ermrest table that contains the annotation
+        :param tag: the specific annotation key (e.g., `...visible-columns`)
+        :param parent: the parent widget
         """
         super(VisibleSourcesEditor, self).__init__(parent=parent)
         assert isinstance(table, _erm.Table)
@@ -32,32 +36,65 @@ class VisibleSourcesEditor(TabbedContextsWidget):
 
         # create tabs for each context
         for context in self.body:
-            if context == 'filter':
-                contents = self.body[context].get('and', [])
-            else:
-                contents = self.body[context]
-            tab = VisibleSourcesContextEditor(self.table, self.tag, context, contents)
-            self.addContext(tab, context)
+            self._addVisibleSourcesContext(context)
 
         # set first context active
         if self.body:
             self.setActiveContext(list(self.body.keys())[0])
+
+    def _addVisibleSourcesContext(self, context: str):
+        """Add the visible sources context editor for the given context.
+        """
+        # adjust the key, body to be used based on context
+        if self.tag == _tag.visible_columns and context == 'filter':
+            key = 'and'
+            body = self.body[context]
+        else:
+            key = context
+            body = self.body
+
+        # determine visible-source dialog editor mode
+        if self.tag == _tag.visible_columns:
+            mode = VisibleSourceDialog.VisibleColumns
+            if context == 'entry':
+                mode &= ~VisibleSourceDialog.AllowPseudoColumn
+            elif context == 'filter':
+                mode = VisibleSourceDialog.AllowPseudoColumn
+        else:
+            mode = VisibleSourceDialog.VisibleForeignKeys
+
+        # dialog exec function
+        def visible_source_dialog_exec_fn(value, parent: QWidget = None):
+            dialog = VisibleSourceDialog(self.table, entry=value, mode=mode, parent=parent)
+            code = dialog.exec_()
+            value = deepcopy(dialog.entry)
+            dialog.hide()
+            del dialog
+            return code, value
+
+        # create and add new context editor
+        contextEditor = CommonTableWidget(
+            key,
+            body,
+            editor_dialog_exec_fn=visible_source_dialog_exec_fn,
+            headers_fn=lambda sources: ["Type", "Source"],
+            row_fn=_source_entry_to_row,
+            parent=self
+        )
+        self.addContext(contextEditor, context)
 
     @pyqtSlot(str)
     def _on_creatContext(self, context):
         """Handles the 'createContextRequested' signal.
         """
         # create new context entry
-        if context == 'filter':
+        if self.tag == _tag.visible_columns and context == 'filter':
             self.body[context] = {'and': []}
-            contents = self.body[context]['and']
         else:
             self.body[context] = []
-            contents = self.body[context]
 
-        # create and add new context editor
-        contextEditor = VisibleSourcesContextEditor(self.table, self.tag, context, contents)
-        self.addContext(contextEditor, context)
+        # add context
+        self._addVisibleSourcesContext(context)
 
     @pyqtSlot(str)
     def _on_removeContext(self, context):
@@ -67,219 +104,53 @@ class VisibleSourcesEditor(TabbedContextsWidget):
         self.removeContext(context)
 
 
-class VisibleSourcesContextEditor(QWidget):
-    """Editor for the visible sources context.
+def _source_entry_to_row(entry):
+    """Converts a visible sources entry into a tuple for use in the table view model.
     """
-
-    @staticmethod
-    def _entry2row(entry):
-        """Converts a visible sources entry into a tuple for use in the table model."""
-
-        if isinstance(entry, str):
-            return (
-                'Column',
-                entry
-            )
-        elif isinstance(entry, list):
-            assert len(entry) == 2
-            return (
-                'Constraint',
-                entry[1]
-            )
-        else:
-            assert isinstance(entry, dict)
-            return (
-                'Pseudo',
-                source_path_to_str(entry.get('source', entry.get('sourcekey', 'virtual')))
-            )
-
-    class TableModel(QAbstractTableModel):
-        """Internal table model for a context."""
-
-        def __init__(self, body):
-            super(VisibleSourcesContextEditor.TableModel, self).__init__()
-            self.headers = ["Type", "Source"]
-            self.rows = [
-                VisibleSourcesContextEditor._entry2row(entry) for entry in body
-            ]
-
-        def rowCount(self, parent):
-            return len(self.rows)
-
-        def columnCount(self, parent):
-            return len(self.headers)
-
-        def data(self, index, role):
-            if role != Qt.DisplayRole:
-                return QVariant()
-            return self.rows[index.row()][index.column()]
-
-        def headerData(self, section, orientation, role):
-            if role != Qt.DisplayRole or orientation != Qt.Horizontal:
-                return QVariant()
-            return self.headers[section]
-
-    table: _erm.Table
-    context: str
-    body: list
-
-    def __init__(self, table, tag, context, body):
-        """Initialize the VisibleSourcesContextEditor.
-        """
-        super(VisibleSourcesContextEditor, self).__init__()
-        self.table, self.context, self.body = table, context, body
-
-        # add/edit mode
-        if tag == _tag.visible_columns:
-            self.mode = VisibleSourceDialog.VisibleColumns
-            if self.context == 'entry':
-                self.mode &= ~VisibleSourceDialog.AllowPseudoColumn
-        else:
-            self.mode = VisibleSourceDialog.VisibleForeignKeys
-
-        # table view
-        self.model = model = VisibleSourcesContextEditor.TableModel(body)
-        self.tableView = QTableView(parent=self)
-        self.tableView.setModel(model)
-
-        # ...table row selection
-        self.tableView.doubleClicked.connect(self.on_doubleclick)
-
-        # ...table view styling
-        self.tableView.setWordWrap(True)
-        self.tableView.setAlternatingRowColors(True)
-        self.tableView.horizontalHeader().setStretchLastSection(True)
-
-        # controls frame
-        controls = QFrame()
-        hlayout = QHBoxLayout()
-        # ...add column button
-        addSource = QPushButton('+', parent=controls)
-        addSource.clicked.connect(self.on_add_click)
-        hlayout.addWidget(addSource)
-        # ...remove column button
-        self.removeSource = QPushButton('-', parent=controls)
-        self.removeSource.clicked.connect(self.on_remove_click)
-        hlayout.addWidget(self.removeSource)
-        # ...duplicate column button
-        self.duplicateSource = QPushButton('copy', parent=controls)
-        self.duplicateSource.clicked.connect(self.on_duplicate_click)
-        hlayout.addWidget(self.duplicateSource)
-        # ...move up button
-        self.moveUp = QPushButton('up', parent=controls)
-        self.moveUp.clicked.connect(self.on_move_up_click)
-        hlayout.addWidget(self.moveUp)
-        # ...move down button
-        self.moveDown = QPushButton('down', parent=controls)
-        self.moveDown.clicked.connect(self.on_move_down_click)
-        hlayout.addWidget(self.moveDown)
-        controls.setLayout(hlayout)
-
-        # tab layout
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.tableView)
-        layout.addWidget(controls)
-        self.setLayout(layout)
-        self.setAutoFillBackground(True)
-
-    @pyqtSlot()
-    def on_add_click(self):
-        """Handler for adding visible source.
-        """
-        dialog = VisibleSourceDialog(self.table, mode=self.mode)
-        code = dialog.exec_()
-        if code == QDialog.Accepted:
-            assert isinstance(self.body, list)
-            self.body.append(dialog.entry)
-            self.tableView.setModel(
-                VisibleSourcesContextEditor.TableModel(self.body)
-            )
-
-    @pyqtSlot()
-    def on_duplicate_click(self):
-        """Handler for duplicating visible source.
-        """
-        index = self.tableView.currentIndex().row()
-        if index >= 0:
-            duplicate = deepcopy(self.body[index])
-            self.body.append(duplicate)
-            self.tableView.setModel(
-                VisibleSourcesContextEditor.TableModel(self.body)
-            )
-
-    @pyqtSlot()
-    def on_remove_click(self):
-        """Handler for removing a visible source.
-        """
-        index = self.tableView.currentIndex().row()
-        if index >= 0:
-            del self.body[index]
-            self.tableView.setModel(
-                VisibleSourcesContextEditor.TableModel(self.body)
-            )
-            index = index if index < len(self.body) else index - 1
-            self.tableView.selectRow(index)
-
-    @pyqtSlot()
-    def on_move_up_click(self):
-        """Handler for reordering (up) a visible source.
-        """
-        i = self.tableView.currentIndex().row()
-        if i > 0:
-            temp = self.body[i]
-            del self.body[i]
-            self.body.insert(i-1, temp)
-            self.tableView.setModel(
-                VisibleSourcesContextEditor.TableModel(self.body)
-            )
-            self.tableView.selectRow(i - 1)
-
-    @pyqtSlot()
-    def on_move_down_click(self):
-        """Handler for reordering (down) a visible source.
-        """
-        i = self.tableView.currentIndex().row()
-        if -1 < i < len(self.body)-1:
-            temp = self.body[i]
-            del self.body[i]
-            self.body.insert(i+1, temp)
-            self.tableView.setModel(
-                VisibleSourcesContextEditor.TableModel(self.body)
-            )
-            self.tableView.selectRow(i + 1)
-
-    @pyqtSlot()
-    def on_doubleclick(self):
-        """Handler for double-click event on a visible-source which opens the editor dialog.
-        """
-        i = self.tableView.currentIndex().row()
-        dialog = VisibleSourceDialog(self.table, entry=deepcopy(self.body[i]), mode=self.mode)
-        code = dialog.exec_()
-        if code == QDialog.Accepted:
-            self.body[i] = dialog.entry
-            self.tableView.setModel(
-                VisibleSourcesContextEditor.TableModel(self.body)
-            )
+    if isinstance(entry, str):
+        return (
+            'Column',
+            entry
+        )
+    elif isinstance(entry, list):
+        assert len(entry) == 2, 'List values in source entry must be pairs (length == 2) only'
+        return (
+            'Constraint',
+            entry[1]
+        )
+    else:
+        assert isinstance(entry, dict), "Source entry type should be a dictionary if not string or list"
+        return (
+            'Pseudo',
+            source_path_to_str(entry.get('source', entry.get('sourcekey', 'virtual')))
+        )
 
 
 class VisibleSourceDialog(QDialog):
-    """Dialog for editing or defining a visible source entry."""
+    """Dialog for editing or defining a visible source entry.
+    """
 
+    # Types of visible-source entries, also used as radio button labels
     COLUMN, CONSTRAINT, PSEUDO = 'Column', 'Constraint', 'Pseudo-Column'
 
-    AllowColumn, AllowPrimaryKey, AllowInboundForeignKey, AllowOutboundForeignKey, AllowPseudoColumn = 1, 2, 4, 8, 16
+    # Modes for visible-source entry
+    AllowColumn, AllowPrimaryKey, AllowInboundForeignKey, AllowOutboundForeignKey, AllowPseudoColumn \
+        = 2**0, 2**1, 2**2, 2**3, 2**4
+
+    # Short-hand for common combinations of visible-source entry modes
     AllowAll = AllowColumn | AllowPrimaryKey | AllowOutboundForeignKey | AllowInboundForeignKey | AllowPseudoColumn
     VisibleColumns = AllowColumn | AllowPrimaryKey | AllowOutboundForeignKey | AllowPseudoColumn
     VisibleForeignKeys = AllowInboundForeignKey | AllowPseudoColumn
 
-    def __init__(self, table, entry=None, mode=AllowAll):
-        """Init the dialog.
+    def __init__(self, table: _erm.Table, entry: dict = None, mode: int = AllowAll, parent: QWidget = None):
+        """Initializes the dialog.
 
         :param table: the ERMrest table model object that contains the entry
         :param entry: a visible source entry
         :param mode: flags to indicate the allowable forms of the visible-source
+        :param parent: the parent widget
         """
-        super(VisibleSourceDialog, self).__init__()
+        super(VisibleSourceDialog, self).__init__(parent=parent)
         assert isinstance(table, _erm.Table)
         self.table = table
         self.entry = entry
