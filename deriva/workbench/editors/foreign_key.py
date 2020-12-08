@@ -3,8 +3,8 @@
 import logging
 from PyQt5.QtWidgets import QWidget, QFormLayout, QVBoxLayout, QGroupBox, QHBoxLayout, QFrame
 from deriva.core import tag, ermrest_model as _erm
-from .common import SimpleTextPropertyWidget, SimpleComboBoxPropertyWidget, MultipleChoicePropertyWidget, \
-    SimpleNestedPropertyManager
+from .common import SimpleTextPropertyWidget, MultipleChoicePropertyWidget, SimpleNestedPropertyManager, \
+    CommentDisplayWidget
 from .sortkeys import SortKeysWidget
 from .tabbed_contexts import EasyTabbedContextsWidget
 
@@ -17,10 +17,6 @@ class ForeignKeyAnnotationEditor(QWidget):
 
     __display__ = 'display'
     __column_order__ = 'column_order'
-    __comment_display_choices__ = [
-        'inline',
-        'tooltip'
-    ]
     __show_foreign_key_link__ = 'show_foreign_key_link'
 
     def __init__(self, fkey: _erm.ForeignKey, parent: QWidget = None):
@@ -42,11 +38,10 @@ class ForeignKeyAnnotationEditor(QWidget):
         to_.setLayout(QFormLayout(to_))
         to_.layout().addRow('Name', SimpleTextPropertyWidget('to_name', self.body, 'Enter a display name'))
         to_.layout().addRow('Comment', SimpleTextPropertyWidget('to_comment', self.body, 'Enter comment text'))
-        to_.layout().addRow('Comment Display', SimpleComboBoxPropertyWidget(
-            'to_comment_display',
+        to_.layout().addRow('Comment Display', CommentDisplayWidget(
             self.body,
-            self.__comment_display_choices__,
-            placeholder='Select a comment display mode'
+            key='to_comment_display',
+            parent=to_
         ))
         to_from_.layout().addWidget(to_)
 
@@ -55,11 +50,10 @@ class ForeignKeyAnnotationEditor(QWidget):
         from_.setLayout(QFormLayout(from_))
         from_.layout().addRow('Name', SimpleTextPropertyWidget('from_name', self.body, 'Enter a display name'))
         from_.layout().addRow('Comment', SimpleTextPropertyWidget('from_comment', self.body, 'Enter comment text'))
-        from_.layout().addRow('Comment Display', SimpleComboBoxPropertyWidget(
-            'from_comment_display',
+        from_.layout().addRow('Comment Display', CommentDisplayWidget(
             self.body,
-            self.__comment_display_choices__,
-            placeholder='Select a comment display mode'
+            key='from_comment_display',
+            parent=from_
         ))
         to_from_.layout().addWidget(from_)
 

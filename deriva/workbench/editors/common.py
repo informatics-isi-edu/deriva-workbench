@@ -226,7 +226,7 @@ class SimpleBooleanPropertyWidget(QCheckBox):
             text: str,
             key: str,
             body: {},
-            truth_fn: Callable = bool,
+            truth_fn: Callable = bool,  # todo: change this to x is not None
             parent: QWidget = None):
         """Initialize the widget
 
@@ -309,18 +309,50 @@ class TemplateEngineWidget(SimpleComboBoxPropertyWidget):
     """Widget for the `template_engine` property.
     """
 
-    def __init__(self, body: {}, parent: QWidget = None):
+    def __init__(
+            self,
+            body: dict,
+            key: str = 'template_engine',
+            choices: iter = frozenset(['handlebars', 'mustache']),
+            placeholder: str = 'Select a template engine',
+            truth_fn: Callable = bool,
+            parent: QWidget = None
+    ):
         """Initialize the widget.
-
-        :param body: annotation body (container)
-        :param parent: parent widget
         """
         super(TemplateEngineWidget, self).__init__(
-            'template_engine',
+            key,
             body,
-            ['handlebars', 'mustache'],
-            'Select a template engine',
-            parent=parent)
+            choices,
+            placeholder=placeholder,
+            truth_fn=truth_fn,
+            parent=parent
+        )
+
+
+class CommentDisplayWidget(SimpleComboBoxPropertyWidget):
+    """Widget for `comment_display` property.
+    """
+
+    def __init__(
+            self,
+            body: dict,
+            key: str = 'comment_display',
+            choices: iter = frozenset(['inline', 'tooltip']),
+            placeholder: str = 'Select a comment display mode',
+            truth_fn: Callable = bool,
+            parent: QWidget = None
+    ):
+        """Initialize the widget.
+        """
+        super(CommentDisplayWidget, self).__init__(
+            key,
+            body,
+            choices,
+            placeholder=placeholder,
+            truth_fn=truth_fn,
+            parent=parent
+        )
 
 
 class MultipleChoicePropertyWidget(QWidget):
