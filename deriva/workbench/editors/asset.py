@@ -3,8 +3,10 @@
 from PyQt5.QtWidgets import QWidget, QFormLayout, QVBoxLayout
 from deriva.core import tag, ermrest_model as _erm
 from .common import SimpleTextPropertyWidget, SimpleComboBoxPropertyWidget, MultipleChoicePropertyWidget
+from .table import CommonTableWidget
 
 __system_cnames__ = {'RID', 'RCB', 'RCT', 'RMB', 'RMT'}
+
 
 class AssetAnnotationEditor(QWidget):
     """Asset annotation editor widget.
@@ -72,7 +74,7 @@ class AssetAnnotationEditor(QWidget):
         # md5, sha256
         for alg in ['md5', 'sha256']:
             form.addRow(
-                alg.capitalize(),
+                alg.upper(),
                 MultipleChoicePropertyWidget(
                     alg,
                     self.body,
@@ -94,4 +96,18 @@ class AssetAnnotationEditor(QWidget):
             )
 
         # filename_ext_filter
-        # todo: simple list widget
+        form.addRow(
+            'File Extensions',
+            CommonTableWidget(
+                'filename_ext_filter',
+                self.body,
+                editor_widget=SimpleTextPropertyWidget(
+                    '_',        # this is just a bogus property name
+                    {'_': ''},  # bogus property, widget will still produce valid `.value`
+                    placeholder='Enter extension (e.g., ".jpg", ".pdf", etc.)',
+                    truth_fn=lambda x: x is not None,
+                    parent=self
+                ),
+                parent=self
+            )
+        )

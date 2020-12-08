@@ -74,7 +74,7 @@ underlying annotation if the text entered can be parsed without errors.
 
 The workbench currently provides enhanced support for a few key annotations, including 
 `visible-columns`, `visible-foreign-keys`, `source-definitions`, `table-display`, 
-`citation`, `display`, and `foreign-key`. For all other annotations, the workbench will fall back to the 
+`citation`, `display`, `foreign-key`, and `asset`. For all other annotations, the workbench will fall back to the 
 JSON editor.
 
 #### a. Editing `visible-columns`

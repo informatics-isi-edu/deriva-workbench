@@ -46,7 +46,7 @@ class CommonTableWidget(QWidget):
             elif data and isinstance(data[0], dict):
                 self.rows = [tuple(entry.values()) for entry in data]
             else:
-                self.rows = [str(entry) for entry in data]
+                self.rows = [(str(entry),) for entry in data]
 
         def rowCount(self, parent):
             return len(self.rows)
