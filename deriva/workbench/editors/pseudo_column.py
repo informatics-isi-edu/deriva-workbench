@@ -76,7 +76,7 @@ class PseudoColumnEditWidget(QGroupBox):
         form.addRow('Source Entry', self.sourceEntry)
 
         # ...entity checkbox
-        self.disableEntityModeCheckbox = QCheckBox('Treat the source as an entity rather than scalar value', parent=self)
+        self.disableEntityModeCheckbox = QCheckBox('Treat the source as a scalar value rather than entity', parent=self)
         self.disableEntityModeCheckbox.setChecked(not self.entry.get('entity', True))
         self.disableEntityModeCheckbox.clicked.connect(self.on_entity_clicked)
         form.addRow('Entity', self.disableEntityModeCheckbox)
