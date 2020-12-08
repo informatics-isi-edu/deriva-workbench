@@ -71,8 +71,8 @@ class AssetAnnotationEditor(QWidget):
             )
         )
 
-        # md5, sha256
-        for alg in ['md5', 'sha256']:
+        # md5 (sha256 is not yet supported)
+        for alg in ['md5']:
             form.addRow(
                 alg.upper(),
                 MultipleChoicePropertyWidget(
