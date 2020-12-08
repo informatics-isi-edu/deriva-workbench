@@ -3,7 +3,7 @@
 import logging
 from PyQt5.QtCore import pyqtSlot, pyqtSignal
 from PyQt5.QtWidgets import QGroupBox, QWidget, QFormLayout, QComboBox, QLineEdit, QCheckBox, QTextEdit, QVBoxLayout, \
-    QListWidget, QHBoxLayout, QPushButton
+    QListWidget, QHBoxLayout, QPushButton, QTabWidget
 from deriva.core import ermrest_model as _erm, tag as _tag
 from .common import SubsetSelectionWidget, source_component_to_str, constraint_name, set_value_or_del_key, SimpleTextPropertyWidget, SimpleComboBoxPropertyWidget, MultipleChoicePropertyWidget, SimpleBooleanPropertyWidget, CommentDisplayWidget
 
@@ -16,7 +16,7 @@ __outbound__ = 'outbound'
 __inbound__ = 'inbound'
 
 
-class PseudoColumnEditWidget(QGroupBox):
+class PseudoColumnEditWidget(QTabWidget):
     """Pseudo-column edit widget.
     """
 
@@ -47,11 +47,11 @@ class PseudoColumnEditWidget(QGroupBox):
             # ...add blank source, if none found... will clean this up later, if not used
             self.entry['source'] = []
 
-        # Form layout
-        form = QFormLayout()
-        self.setLayout(form)
-
         # -- Source attributes --
+        sourceTab = QWidget(parent=self)
+        form = QFormLayout(sourceTab)
+        sourceTab.setLayout(form)
+        self.addTab(sourceTab, 'Source')
 
         # ...sourcekey
         sourcekeys = self.table.annotations.get(_tag.source_definitions, {}).get('sources', {}).keys()
@@ -83,6 +83,10 @@ class PseudoColumnEditWidget(QGroupBox):
         form.addRow('Source Entry', self.sourceEntry)
 
         # -- Options --
+        optionsTab = QWidget(parent=self)
+        form = QFormLayout(optionsTab)
+        optionsTab.setLayout(form)
+        self.addTab(optionsTab, 'Options')
 
         # ...markdown name
         form.addRow('Markdown Name', SimpleTextPropertyWidget(
@@ -139,6 +143,10 @@ class PseudoColumnEditWidget(QGroupBox):
         # todo
 
         # -- Display attributes --
+        displayTab = QWidget(parent=self)
+        form = QFormLayout(displayTab)
+        displayTab.setLayout(form)
+        self.addTab(displayTab, 'Display')
 
         # ...markdown display line edit
         self.markdownPatternLineEdit = QTextEdit(display.get('markdown_pattern', ''), parent=self)
