@@ -2,7 +2,7 @@
 """
 from collections.abc import Callable
 import logging
-from typing import Any
+from typing import Any, Union
 from PyQt5.QtWidgets import QVBoxLayout, QWidget, QCheckBox, QListWidget, QListWidgetItem, QComboBox, QLineEdit, \
     QButtonGroup, QBoxLayout, QHBoxLayout, QRadioButton
 from PyQt5.QtGui import QValidator
@@ -435,10 +435,16 @@ class SimpleNestedPropertyManager(QObject):
     barWidget.valueChanged.connect(mgr.onValueChanged)
     ```
 
+    Managers can be nested and listen for changes from subordinate managers by connecting to their `valueChanged`
+    signal.
+
     *Note*: This object is not a display widget.
     """
 
-    def __init__(self, key: str, body: dict, truth_fn: Callable = bool, parent: QObject = None):
+    value: dict
+    valueChanged = pyqtSignal()
+
+    def __init__(self, key: str, body: dict, truth_fn: Callable = bool, parent: Union[QObject, QWidget, None] = None):
         """Initialize the container.
 
         :param key: the key of the nested property container.
@@ -464,3 +470,4 @@ class SimpleNestedPropertyManager(QObject):
             self.key,
             self.value
         )
+        self.valueChanged.emit()

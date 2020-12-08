@@ -79,6 +79,7 @@ class VisibleSourcesEditor(TabbedContextsWidget):
             editor_dialog_exec_fn=visible_source_dialog_exec_fn,
             headers_fn=lambda sources: ["Type", "Source"],
             row_fn=_source_entry_to_row,
+            truth_fn=lambda x: x is not None,
             parent=self
         )
         self.addContext(contextEditor, context)

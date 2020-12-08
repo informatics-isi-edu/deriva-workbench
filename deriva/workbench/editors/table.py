@@ -73,7 +73,7 @@ class CommonTableWidget(QWidget):
             headers_fn: Callable = None,
             row_fn: Callable = None,
             resize_mode: QHeaderView.ResizeMode = QHeaderView.Stretch,
-            truth_fn: Callable = lambda v: v is not None,
+            truth_fn: Callable = bool,
             parent: QWidget = None
     ):
         """Initialize the widget.

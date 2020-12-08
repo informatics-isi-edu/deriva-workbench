@@ -2,16 +2,19 @@
 """
 from copy import deepcopy
 import logging
-from PyQt5.QtWidgets import QLabel, QVBoxLayout, QFrame, QWidget, QTableView, QGroupBox, QFormLayout, \
-    QPushButton, QHBoxLayout, QDialog, QDialogButtonBox, QMessageBox, QComboBox, QLineEdit
-from PyQt5.QtCore import QAbstractTableModel, QVariant, Qt, pyqtSlot
+from PyQt5.QtWidgets import QLabel, QVBoxLayout, QFrame, QWidget, QTableView, QGroupBox, \
+    QPushButton, QHBoxLayout, QDialog, QDialogButtonBox, QMessageBox
+from PyQt5.QtCore import QAbstractTableModel, QVariant, Qt, pyqtSlot, pyqtSignal
 from deriva.core import tag as _tag, ermrest_model as _erm
 from .pseudo_column import PseudoColumnEditWidget
-from .common import source_path_to_str, constraint_name, SomeOrAllSelectorWidget
+from .common import source_path_to_str, constraint_name, SomeOrAllSelectorWidget, SimpleComboBoxPropertyWidget, \
+    SimpleTextPropertyWidget, SimpleNestedPropertyManager
+from .table import CommonTableWidget
 
 logger = logging.getLogger(__name__)
 
-_search_box_key = 'search-box'
+__sources__ = 'sources'
+__search_box_key__ = 'search-box'
 
 
 class SourceDefinitionsEditor(QWidget):
@@ -27,6 +30,12 @@ class SourceDefinitionsEditor(QWidget):
         super(SourceDefinitionsEditor, self).__init__()
         self.table = table
         self.body = self.table.annotations[_tag.source_definitions]
+        self.column_names = [c.name for c in self.table.columns]
+
+        # nested property managers
+        self._sources_manager = SimpleNestedPropertyManager(__sources__, self.body, parent=self)
+        self._search_box_manager = SimpleNestedPropertyManager(__search_box_key__, self._sources_manager.value, parent=self)
+        self._search_box_manager.valueChanged.connect(self._sources_manager.onValueChanged)
 
         # layout
         layout = QVBoxLayout(self)
@@ -60,14 +69,25 @@ class SourceDefinitionsEditor(QWidget):
         sourcesGroup = QGroupBox('Sources: configure source definitions for use in other annotations', parent=self)
         sourcesGroup.setLayout(QVBoxLayout(sourcesGroup))
         sourcesGroup.layout().setContentsMargins(0, 0, 0 , 0)
-        sourcesGroup.layout().addWidget(_SourcesWidget(self.table, parent=self))
+        sourcesWidget = _SourcesWidget(self.table, self._sources_manager.value, parent=self)
+        sourcesWidget.valueChanged.connect(self._sources_manager.onValueChanged)
+        sourcesGroup.layout().addWidget(sourcesWidget)
         layout.addWidget(sourcesGroup)
 
         # ...search-box
         searchBoxGroup = QGroupBox('Search Box: configure the search columns')
         searchBoxGroup.setLayout(QVBoxLayout(searchBoxGroup))
-        searchBoxGroup.layout().setContentsMargins(0, 0, 0 , 0)
-        searchBoxGroup.layout().addWidget(_SearchBoxEditWidget(self.table, parent=self))
+        searchBoxGroup.layout().setContentsMargins(0, 0, 0, 0)
+        searchBoxWidget = CommonTableWidget(
+            'or',
+            self._search_box_manager.value,
+            editor_widget=_SearchColumnWidget(self.column_names, parent=searchBoxGroup),
+            headers_fn=lambda searchcols: ["Source", "Markdown Name"],
+            row_fn=lambda searchcol: (searchcol['source'], searchcol.get('markdown_name')),
+            parent=searchBoxGroup
+        )
+        searchBoxWidget.valueChanged.connect(self._search_box_manager.onValueChanged)
+        searchBoxGroup.layout().addWidget(searchBoxWidget)
         layout.addWidget(searchBoxGroup)
 
     @pyqtSlot()
@@ -95,7 +115,11 @@ class _SourcesWidget(QWidget):
             super(_SourcesWidget.TableModel, self).__init__()
             self.headers = ["Source Key", "Source"]
             self.rows = [
-                (key, source_path_to_str(sources[key].get('source', sources[key].get('sourcekey', 'virtual')))) for key in sources
+                (
+                    key,
+                    source_path_to_str(sources[key].get('source', sources[key].get('sourcekey', 'virtual')))
+                )
+                for key in sources if key not in {__search_box_key__}
             ]
 
         def rowCount(self, parent):
@@ -115,15 +139,14 @@ class _SourcesWidget(QWidget):
             return self.headers[section]
 
     table: _erm.Table
-    body: dict
+    valueChanged = pyqtSignal()
 
-    def __init__(self, table, parent: QWidget = None):
+    def __init__(self, table: _erm.Table, sources: dict, parent: QWidget = None):
         """Initialize the _SourcesWidget.
         """
         super(_SourcesWidget, self).__init__(parent=parent)
         self.table = table
-        self.body = self.table.annotations[_tag.source_definitions]
-        self.sources = self.body['sources'] = self.body.get('sources', {})
+        self.sources = sources
         self.column_names = set([c.name for c in self.table.columns])
 
         # table view
@@ -164,17 +187,25 @@ class _SourcesWidget(QWidget):
         layout.addWidget(controls)
         self.setLayout(layout)
 
+    @property
+    def value(self):
+        return self.sources
+
     @pyqtSlot()
     def on_add_click(self):
         """Handler for adding source def.
         """
-        dialog = SourceDefinitionDialog(self.table, reserved_keys=self.column_names | {_search_box_key} | self.sources.keys(), parent=self)
+        dialog = _SourceDefinitionDialog(
+            self.table,
+            reserved_keys=self.column_names | {__search_box_key__} | self.sources.keys(),
+            parent=self)
         code = dialog.exec_()
         if code == QDialog.Accepted:
             self.sources[dialog.sourcekey] = dialog.entry
             self.tableView.setModel(
                 _SourcesWidget.TableModel(self.sources)
             )
+            self.valueChanged.emit()
 
     @pyqtSlot()
     def on_duplicate_click(self):
@@ -192,6 +223,7 @@ class _SourcesWidget(QWidget):
             self.tableView.setModel(
                 _SourcesWidget.TableModel(self.sources)
             )
+            self.valueChanged.emit()
 
     @pyqtSlot()
     def on_remove_click(self):
@@ -204,8 +236,9 @@ class _SourcesWidget(QWidget):
             self.tableView.setModel(
                 _SourcesWidget.TableModel(self.sources)
             )
-            index = index if index < len(self.body) else index - 1
+            index = index if index < len(self.sources) else index - 1
             self.tableView.selectRow(index)
+            self.valueChanged.emit()
 
     @pyqtSlot()
     def on_doubleclick(self):
@@ -213,11 +246,11 @@ class _SourcesWidget(QWidget):
         """
         index = self.tableView.currentIndex().row()
         sourcekey = self.tableView.model().rows[index][0]
-        dialog = SourceDefinitionDialog(self.table,
-                                        sourcekey=sourcekey,
-                                        entry=deepcopy(self.sources[sourcekey]),
-                                        reserved_keys=self.column_names | {_search_box_key} | self.sources.keys() - {sourcekey},
-                                        parent=self)
+        dialog = _SourceDefinitionDialog(self.table,
+                                         sourcekey=sourcekey,
+                                         entry=deepcopy(self.sources[sourcekey]),
+                                         reserved_keys=self.column_names | {__search_box_key__} | self.sources.keys() - {sourcekey},
+                                         parent=self)
         code = dialog.exec_()
         if code == QDialog.Accepted:
             del self.sources[sourcekey]
@@ -225,6 +258,7 @@ class _SourcesWidget(QWidget):
             self.tableView.setModel(
                 _SourcesWidget.TableModel(self.sources)
             )
+            self.valueChanged.emit()
 
     @pyqtSlot()
     def on_click(self):
@@ -233,7 +267,7 @@ class _SourcesWidget(QWidget):
         idx = self.tableView.currentIndex()
 
 
-class SourceDefinitionDialog(QDialog):
+class _SourceDefinitionDialog(QDialog):
     """Dialog for defining or editing a source definition.
     """
 
@@ -242,7 +276,7 @@ class SourceDefinitionDialog(QDialog):
     reserved_keys = [str]
 
     def __init__(self, table: _erm.Table, sourcekey: str = '', entry: dict = None, reserved_keys: set or iter = None, parent: QWidget = None):
-        super(SourceDefinitionDialog, self).__init__(parent=parent)
+        super(_SourceDefinitionDialog, self).__init__(parent=parent)
         self.table = table
         self.sourcekey = sourcekey
         self.entry = entry or {}
@@ -303,204 +337,42 @@ class SourceDefinitionDialog(QDialog):
         # ...remove sourcekey from entry before returning
         self.sourcekey = self.entry['sourcekey']
         del self.entry['sourcekey']
-        return super(SourceDefinitionDialog, self).accept()
-
-
-class _SearchBoxEditWidget(QWidget):
-    """Editor widget for the Search Box source.
-    """
-
-    class TableModel(QAbstractTableModel):
-        """Internal table model.
-        """
-
-        def __init__(self, searchcolumns):
-            super(_SearchBoxEditWidget.TableModel, self).__init__()
-            self.headers = ["Source", "Markdown Name"]
-            self.rows = [
-                (searchcol['source'], searchcol.get('markdown_name')) for searchcol in searchcolumns
-            ]
-
-        def rowCount(self, parent):
-            return len(self.rows)
-
-        def columnCount(self, parent):
-            return len(self.headers)
-
-        def data(self, index, role):
-            if role != Qt.DisplayRole:
-                return QVariant()
-            return self.rows[index.row()][index.column()]
-
-        def headerData(self, section, orientation, role):
-            if role != Qt.DisplayRole or orientation != Qt.Horizontal:
-                return QVariant()
-            return self.headers[section]
-
-    table: _erm.Table
-    body: dict
-
-    def __init__(self, table, parent: QWidget = None):
-        """Initialize the _SearchBoxEditWidget.
-        """
-        super(_SearchBoxEditWidget, self).__init__(parent=parent)
-        self.table = table
-        self.body = self.table.annotations[_tag.source_definitions]
-        self.sources = self.body['sources'] = self.body.get('sources', {})
-        self.column_names = set([c.name for c in self.table.columns])
-
-        # table view
-        self.model = model = _SearchBoxEditWidget.TableModel(self.sources.get(_search_box_key, {}).get('or', []))
-        self.tableView = QTableView(parent=self)
-        self.tableView.setModel(model)
-
-        # ...table selection change
-        self.tableView.clicked.connect(self.on_click)
-
-        # ...table view styling
-        self.tableView.setWordWrap(True)
-        self.tableView.setAlternatingRowColors(True)
-        self.tableView.horizontalHeader().setStretchLastSection(True)
-
-        # controls frame
-        controls = QFrame()
-        hlayout = QHBoxLayout()
-        hlayout.setContentsMargins(0, 0, 0, 0)
-        # ...add column button
-        addSource = QPushButton('+', parent=controls)
-        addSource.clicked.connect(self.on_add_click)
-        hlayout.addWidget(addSource)
-        # ...remove column button
-        self.removeSource = QPushButton('-', parent=controls)
-        self.removeSource.clicked.connect(self.on_remove_click)
-        hlayout.addWidget(self.removeSource)
-        controls.setLayout(hlayout)
-
-        # layout
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.tableView)
-        layout.addWidget(controls)
-        self.setLayout(layout)
-
-    @pyqtSlot()
-    def on_add_click(self):
-        """Handler for adding source def.
-        """
-        dialog = _SearchColumnDialog(self.column_names, parent=self)
-        code = dialog.exec_()
-        if code == QDialog.Accepted:
-            # get search column from dialog
-            searchcolumn = {
-                'source': dialog.source
-            }
-            if dialog.markdown_name:
-                searchcolumn['markdown_name'] = dialog.markdown_name
-
-            # update annotation
-            if _search_box_key in self.sources:
-                # append to existing search columns
-                self.sources[_search_box_key]['or'].append(searchcolumn)
-            else:
-                # initialize the search-box source
-                self.sources[_search_box_key] = {
-                    'or': [
-                        searchcolumn
-                    ]
-                }
-
-            # update display model
-            self.tableView.setModel(
-                _SearchBoxEditWidget.TableModel(self.sources[_search_box_key]['or'])
-            )
-
-    @pyqtSlot()
-    def on_remove_click(self):
-        """Handler for removing a source def.
-        """
-        index = self.tableView.currentIndex().row()
-        if index >= 0:
-            del self.sources[_search_box_key]['or'][index]
-
-            # update display model
-            self.tableView.setModel(
-                _SearchBoxEditWidget.TableModel(self.sources[_search_box_key]['or'])
-            )
-            index = index if index < len(self.body) else index - 1
-            self.tableView.selectRow(index)
-
-            # purge 'search-box' source, if empty
-            if not self.sources[_search_box_key]['or']:
-                del self.sources[_search_box_key]
-
-    @pyqtSlot()
-    def on_click(self):
-        """Handler for click event on a source which records its index for use in combination with other commands.
-        """
-        idx = self.tableView.currentIndex()
-
-
-class _SearchColumnDialog(QDialog):
-    """Dialog for adding a searchcolumn to the `search-box`.
-    """
-
-    source = str or None
-    markdown_name = str or None
-
-    def __init__(self, column_names: [str], parent: QWidget = None):
-        super(_SearchColumnDialog, self).__init__(parent=parent)
-        self.source = None
-        self.markdown_name = None
-
-        self.setWindowTitle("Search Column")
-        form = QFormLayout(self)
-        form.addWidget(QLabel("Select a column and enter an optional markdown_name."))
-
-        # source combobox
-        self._sourceComboBox = QComboBox(parent=self)
-        self._sourceComboBox.setPlaceholderText('Select a column')
-        self._sourceComboBox.addItems(column_names)
-        form.addRow('Source', self._sourceComboBox)
-
-        # markdown name edit
-        self._markdownNameLineEdit = QLineEdit(parent=self)
-        self._markdownNameLineEdit.setPlaceholderText("Enter a markdown pattern")
-        form.addRow('Markdown Name', self._markdownNameLineEdit)
-
-        # ...ok/cancel
-        buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttonBox.accepted.connect(self.accept)
-        buttonBox.rejected.connect(self.reject)
-        form.addWidget(buttonBox)
-        self.setLayout(form)
-
-    def accept(self) -> None:
-        """Overrides the default accept to perform validation before accepting.
-        """
-        index = self._sourceComboBox.currentIndex()
-        if index < 0:
-            QMessageBox.critical(
-                self,
-                'Validation Error',
-                'Source required.',
-                QMessageBox.Ok
-            )
-            return
-
-        # valid if this point reached
-        self.source = self._sourceComboBox.itemText(index)
-        self.markdown_name = self._markdownNameLineEdit.text()
-        return super(_SearchColumnDialog, self).accept()
+        return super(_SourceDefinitionDialog, self).accept()
 
 
 class _SearchColumnWidget(QWidget):
     """Widget for adding a `searchcolumn` to the `search-box` property.
     """
 
-    source = str or None
-    markdown_name = str or None
-
     def __init__(self, column_names: list, parent: QWidget = None):
         super(_SearchColumnWidget, self).__init__(parent=parent)
         self._value = {}
-        self.source = None
-        self.markdown_name = None
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+
+        # ...source
+        layout.addWidget(
+            SimpleComboBoxPropertyWidget(
+                'source',
+                self._value,
+                column_names,
+                placeholder='Select column name',
+                parent=self
+            )
+        )
+
+        # ...markdown_name
+        layout.addWidget(
+            SimpleTextPropertyWidget(
+                'markdown_name',
+                self._value,
+                'Enter markdown pattern',
+                parent=self
+            )
+        )
+
+    @property
+    def value(self):
+        return self._value

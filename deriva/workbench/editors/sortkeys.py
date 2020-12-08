@@ -24,7 +24,6 @@ class SortKeysWidget(CommonTableWidget):
                 sortkey if isinstance(sortkey, str) else sortkey['column'],
                 sortkey.get('descending', False) if isinstance(sortkey, dict) else False
             ),
-            truth_fn=bool,
             parent=parent)
 
 
