@@ -1,7 +1,7 @@
 """Pseudo-Column editor widgets.
 """
 import logging
-from PyQt5.QtCore import pyqtSlot
+from PyQt5.QtCore import pyqtSlot, pyqtSignal
 from PyQt5.QtWidgets import QGroupBox, QWidget, QFormLayout, QComboBox, QLineEdit, QCheckBox, QTextEdit, QVBoxLayout, \
     QListWidget, QHBoxLayout, QPushButton
 from deriva.core import ermrest_model as _erm, tag as _tag
@@ -11,6 +11,9 @@ logger = logging.getLogger(__name__)
 
 # property keys
 __sourcekey__ = 'sourcekey'
+__source__ = 'source'
+__outbound__ = 'outbound'
+__inbound__ = 'inbound'
 
 
 class PseudoColumnEditWidget(QGroupBox):
@@ -304,13 +307,21 @@ class PseudoColumnEditWidget(QGroupBox):
 
 
 class SourceEntryWidget(QWidget):
-    """Source entry widget.
+    """Pseudo-column 'source' property editor widget.
     """
 
     table: _erm.Table
     entry: dict
 
+    valueChanged = pyqtSignal()
+
     def __init__(self, table: _erm.Table, entry: dict, parent: QWidget = None):
+        """Initializes the widget.
+
+        :param table: the root ermrest table for the source entry
+        :param entry: the visible-source pseudo-column entry dictionary; must contain an 'source' property
+        :param parent: the parent widget
+        """
         super(SourceEntryWidget, self).__init__(parent=parent)
         self.table = table
         self.entry = entry
@@ -326,11 +337,11 @@ class SourceEntryWidget(QWidget):
         vlayout.addWidget(self.sourceList)
 
         # get source entry and enforce a canonical structure as a list of elements
-        source = self.entry['source']
+        source = self.entry[__source__]
         if isinstance(source, str):
-            self.entry['source'] = source = [source]
+            self.entry[__source__] = source = [source]
         elif isinstance(source, list) and len(source) == 2 and all(isinstance(item, str) for item in source):
-            self.entry['source'] = source = [{'outbound': source}]
+            self.entry[__source__] = source = [{__outbound__: source}]
 
         # populate source list widget and update context
         validated_path = []
@@ -341,21 +352,21 @@ class SourceEntryWidget(QWidget):
                     # case: column name
                     column = {col.name: col for col in self.context[-1].columns}[item]
                     self.context.append(column)
-                elif 'outbound' in item:
+                elif __outbound__ in item:
                     # case: outbound fkey
-                    fkey = self.table.schema.model.fkey(item['outbound'])
+                    fkey = self.table.schema.model.fkey(item[__outbound__])
                     self.context.append(fkey.pk_table)
                 else:
                     # case: inbound fkey
-                    assert 'inbound' in item
-                    fkey = self.table.schema.model.fkey(item['inbound'])
+                    assert __inbound__ in item
+                    fkey = self.table.schema.model.fkey(item[__inbound__])
                     self.context.append(fkey.table)
                 # update the source list
                 self.sourceList.addItem(source_component_to_str(item))
                 validated_path.append(item)
         except KeyError as e:
             logger.error("Invalid path component %s found in source entry %s" % (str(e), str(source)))
-            self.entry['source'] = validated_path  # set source to the valid partial path
+            self.entry[__source__] = validated_path  # set source to the valid partial path
 
         # available sources combobox
         self.availableSource = QComboBox(parent=self)
@@ -381,6 +392,12 @@ class SourceEntryWidget(QWidget):
         # ...add remaining controls to form
         vlayout.addWidget(controls)
 
+    @property
+    def value(self):
+        """Returns the 'source' property value.
+        """
+        return self.entry[__source__]
+
     def _updateAvailableSourcesFromTable(self, table):
         """Updates the list of available sources based on the given table."""
 
@@ -394,17 +411,18 @@ class SourceEntryWidget(QWidget):
         for fkey in table.foreign_keys:
             self.availableSource.addItem(
                 "%s:%s (outbound)" % tuple(constraint_name(fkey)),
-                userData={'outbound': fkey}
+                userData={__outbound__: fkey}
             )
         for ref in table.referenced_by:
             self.availableSource.addItem(
                 "%s:%s (inbound)" % tuple(constraint_name(ref)),
-                userData={'inbound': ref}
+                userData={__inbound__: ref}
             )
 
     @pyqtSlot()
     def on_push(self):
-        """Handler for pushing a path element onto the source entry."""
+        """Handler for pushing a path element onto the 'source' property.
+        """
         data = self.availableSource.currentData()
         if not data:
             return
@@ -420,42 +438,49 @@ class SourceEntryWidget(QWidget):
             self.availableSource.clear()
             self.availableSource.setEnabled(False)
             self.pushButton.setEnabled(False)
-            self.entry['source'].append(data.name)
-        elif 'outbound' in data:
-            fkey = data['outbound']
+            self.entry[__source__].append(data.name)
+        elif __outbound__ in data:
+            fkey = data[__outbound__]
             assert isinstance(fkey, _erm.ForeignKey)
             context = fkey.pk_table
             self._updateAvailableSourcesFromTable(context)
-            self.entry['source'].append({
-                'outbound': constraint_name(fkey)
+            self.entry[__source__].append({
+                __outbound__: constraint_name(fkey)
             })
         else:
-            fkey = data['inbound']
+            fkey = data[__inbound__]
             assert isinstance(fkey, _erm.ForeignKey)
             context = fkey.table
             self._updateAvailableSourcesFromTable(context)
-            self.entry['source'].append({
-                'inbound': constraint_name(fkey)
+            self.entry[__source__].append({
+                __inbound__: constraint_name(fkey)
             })
 
         # update control state
         self.context.append(context)
         self.popButton.setEnabled(True)
 
+        # emit changes
+        self.valueChanged.emit()
+
     @pyqtSlot()
     def on_pop(self):
-        """Handler for popping the top path element of a source entry."""
+        """Handler for popping the top path element of the 'source' property.
+        """
 
         # update source list
         self.sourceList.takeItem(len(self.sourceList)-1)
 
         # update entry source
-        if self.entry['source']:
-            self.entry['source'].pop()
+        if self.entry[__source__]:
+            self.entry[__source__].pop()
             self.context.pop()
             self._updateAvailableSourcesFromTable(self.context[-1])
 
         # update control state
         self.availableSource.setEnabled(True)
         self.pushButton.setEnabled(True)
-        self.popButton.setEnabled(len(self.entry['source']) > 0)
+        self.popButton.setEnabled(len(self.entry[__source__]) > 0)
+
+        # emit changes
+        self.valueChanged.emit()
