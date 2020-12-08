@@ -5,9 +5,12 @@ from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtWidgets import QGroupBox, QWidget, QFormLayout, QComboBox, QLineEdit, QCheckBox, QTextEdit, QVBoxLayout, \
     QListWidget, QHBoxLayout, QPushButton
 from deriva.core import ermrest_model as _erm, tag as _tag
-from .common import SubsetSelectionWidget, source_component_to_str, constraint_name, set_value_or_del_key
+from .common import SubsetSelectionWidget, source_component_to_str, constraint_name, set_value_or_del_key, SimpleTextPropertyWidget, SimpleComboBoxPropertyWidget
 
 logger = logging.getLogger(__name__)
+
+# property keys
+__sourcekey__ = 'sourcekey'
 
 
 class PseudoColumnEditWidget(QGroupBox):
@@ -50,23 +53,24 @@ class PseudoColumnEditWidget(QGroupBox):
         # ...sourcekey
         sourcekeys = self.table.annotations.get(_tag.source_definitions, {}).get('sources', {}).keys()
         if bool(mode & PseudoColumnEditWidget.PseudoColumn):
-            self.sourceKeyComboBox = QComboBox(parent=self)
-            self.sourceKeyComboBox.addItem('')
-            self.sourceKeyComboBox.addItems(sourcekeys)
-            self.sourceKeyComboBox.setPlaceholderText('Select a source key')
-            self.sourceKeyComboBox.setCurrentIndex(
-                self.sourceKeyComboBox.findText(self.entry.get('sourcekey', '')) or -1
+            enable_source_entry = __sourcekey__ not in self.entry  # enable if no sourcekey property exists
+            sourceKeyComboBox = SimpleComboBoxPropertyWidget(
+                __sourcekey__,
+                self.entry,
+                sourcekeys,
+                placeholder='Select a source key',
+                parent=self
             )
-            self.sourceKeyComboBox.currentIndexChanged.connect(self.on_sourcekey_indexchanged)
-            enable_source_entry = bool(self.sourceKeyComboBox.currentIndex() == -1)  # enable if no sourcekey selected
-            form.addRow('Source Key', self.sourceKeyComboBox)
+            sourceKeyComboBox.valueChanged.connect(self.on_sourcekey_valueChanged)
+            form.addRow('Source Key', sourceKeyComboBox)
         elif bool(mode & PseudoColumnEditWidget.SourceDefinition):
-            self.sourceKeyEdit = QLineEdit(parent=self)
-            self.sourceKeyEdit.setText(self.entry.get('sourcekey'))
-            self.sourceKeyEdit.setPlaceholderText('Enter source key')
-            self.sourceKeyEdit.textChanged.connect(self.on_sourcekey_textchanged)
             enable_source_entry = True
-            form.addRow('Source Key', self.sourceKeyEdit)
+            form.addRow('Source Key', SimpleTextPropertyWidget(
+                __sourcekey__,
+                self.entry,
+                placeholder='Enter source key',
+                parent=self
+            ))
         else:
             raise ValueError('Invalid mode selected for source key control initialization')
 
@@ -162,27 +166,10 @@ class PseudoColumnEditWidget(QGroupBox):
         form.addRow('Array UX Mode', self.arrayUXModeComboBox)
 
     @pyqtSlot()
-    def on_sourcekey_indexchanged(self):
+    def on_sourcekey_valueChanged(self):
         """Handles changes to the `sourcekey` combobox.
         """
-        sourcekey = self.sourceKeyComboBox.currentText()
-        if sourcekey:
-            self.entry['sourcekey'] = sourcekey
-            self.sourceEntry.setEnabled(False)
-        else:
-            self.sourceEntry.setEnabled(True)
-            if 'sourcekey' in self.entry:
-                del self.entry['sourcekey']
-
-    @pyqtSlot()
-    def on_sourcekey_textchanged(self):
-        """Handles changes to the `sourcekey` line edit.
-        """
-        sourcekey = self.sourceKeyEdit.text()
-        if sourcekey:
-            self.entry['sourcekey'] = sourcekey
-        elif 'sourcekey' in self.entry:
-            del self.entry['sourcekey']
+        self.sourceEntry.setEnabled(__sourcekey__ not in self.entry)
 
     @pyqtSlot()
     def on_entity_clicked(self):

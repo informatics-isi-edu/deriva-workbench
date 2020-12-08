@@ -286,7 +286,8 @@ class SimpleComboBoxPropertyWidget(QComboBox):
         self.key, self.body = key, body
         self._truth_fn = truth_fn
         self.value = self.body.get(self.key, '')
-        self.addItems([''] + choices)
+        self.addItem('')
+        self.addItems(choices)
         self.setPlaceholderText(placeholder)
         if isinstance(self.value, str):  # ignore non-str values
             self.setCurrentIndex(self.findText(self.value) or -1)
