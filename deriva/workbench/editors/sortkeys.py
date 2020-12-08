@@ -66,9 +66,6 @@ class _SortKeyWidget(QWidget):
             )
         )
 
-        children = layout.children()
-        print(children)
-
     @property
     def value(self):
         return self._value

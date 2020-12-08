@@ -490,3 +490,17 @@ class _SearchColumnDialog(QDialog):
         self.source = self._sourceComboBox.itemText(index)
         self.markdown_name = self._markdownNameLineEdit.text()
         return super(_SearchColumnDialog, self).accept()
+
+
+class _SearchColumnWidget(QWidget):
+    """Widget for adding a `searchcolumn` to the `search-box` property.
+    """
+
+    source = str or None
+    markdown_name = str or None
+
+    def __init__(self, column_names: list, parent: QWidget = None):
+        super(_SearchColumnWidget, self).__init__(parent=parent)
+        self._value = {}
+        self.source = None
+        self.markdown_name = None
