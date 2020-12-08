@@ -5,7 +5,7 @@ from PyQt5.QtCore import pyqtSlot, pyqtSignal
 from PyQt5.QtWidgets import QGroupBox, QWidget, QFormLayout, QComboBox, QLineEdit, QCheckBox, QTextEdit, QVBoxLayout, \
     QListWidget, QHBoxLayout, QPushButton
 from deriva.core import ermrest_model as _erm, tag as _tag
-from .common import SubsetSelectionWidget, source_component_to_str, constraint_name, set_value_or_del_key, SimpleTextPropertyWidget, SimpleComboBoxPropertyWidget
+from .common import SubsetSelectionWidget, source_component_to_str, constraint_name, set_value_or_del_key, SimpleTextPropertyWidget, SimpleComboBoxPropertyWidget, MultipleChoicePropertyWidget, SimpleBooleanPropertyWidget, CommentDisplayWidget
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class PseudoColumnEditWidget(QGroupBox):
     def __init__(self, table: _erm.Table, entry: dict, mode: int = PseudoColumn, parent: QWidget = None):
         """Initialize the pseudo-column editor widget.
 
-        :param table: the ermrest_model.Table instance that contains this pseudo-column
+        :param table: the ermrest table instance that contains this pseudo-column
         :param entry: the pseudo-column entry (can take many forms)
         :param mode: the mode flag (PseudoColumn or SourceDefinition)
         :param parent: the QWidget parent of this widget
@@ -77,61 +77,71 @@ class PseudoColumnEditWidget(QGroupBox):
         else:
             raise ValueError('Invalid mode selected for source key control initialization')
 
-        # source entry widget
+        # ...source
         self.sourceEntry = SourceEntryWidget(self.table, self.entry, self)
         self.sourceEntry.setEnabled(enable_source_entry)
         form.addRow('Source Entry', self.sourceEntry)
 
-        # ...entity checkbox
-        self.disableEntityModeCheckbox = QCheckBox('Treat the source as a scalar value rather than entity', parent=self)
-        self.disableEntityModeCheckbox.setChecked(not self.entry.get('entity', True))
-        self.disableEntityModeCheckbox.clicked.connect(self.on_entity_clicked)
-        form.addRow('Entity', self.disableEntityModeCheckbox)
+        # -- Options --
 
-        # ...self_link checkbox
-        self.selfLinkCheckbox = QCheckBox('If source is key, switch display mode to self link', parent=self)
-        self.selfLinkCheckbox.setChecked(self.entry.get('self_link', False))
-        self.selfLinkCheckbox.clicked.connect(self.on_self_link_clicked)
-        form.addRow('Self Link', self.selfLinkCheckbox)
+        # ...markdown name
+        form.addRow('Markdown Name', SimpleTextPropertyWidget(
+            'markdown_name',
+            self.entry,
+            placeholder='Enter markdown pattern',
+            parent=self
+        ))
 
-        # ...aggregate combobox
-        self.aggregateComboBox = QComboBox(parent=self)
-        self.aggregateComboBox.setPlaceholderText('Select aggregate function, if desired')
-        self.aggregateComboBox.insertItems(0, ['', 'min', 'max', 'cnt', 'cnt_d', 'array', 'array_d'])
-        self.aggregateComboBox.setCurrentIndex(
-            self.aggregateComboBox.findText(self.entry.get('aggregate', '')) or -1
+        # ...comment
+        form.addRow('Comment', SimpleTextPropertyWidget(
+            'comment',
+            self.entry,
+            placeholder='Enter plain text',
+            parent=self
+        ))
+
+        # ...comment_display
+        form.addRow('Comment Display', CommentDisplayWidget(self.entry, parent=self))
+
+        # ...entity
+        entityWidget = MultipleChoicePropertyWidget(
+            'entity',
+            self.entry,
+            {
+                'Treat as an entity': True,
+                'Treat as a scalar value': False,
+                'Default behavior': None
+            },
+            parent=self
         )
-        self.aggregateComboBox.currentIndexChanged.connect(self.on_aggregate_change)
-        form.addRow('Aggregate', self.aggregateComboBox)
+        entityWidget.layout().setContentsMargins(0, 0, 0, 0)
+        form.addRow('Entity', entityWidget)
 
-        # -- Other attributes --
+        # ...self_link
+        form.addRow('Self Link', SimpleBooleanPropertyWidget(
+            'If source is key, switch display mode to self link',
+            'self_link',
+            self.entry,
+            truth_fn=lambda x: x is not None,
+            parent=self
+        ))
 
-        # ...markdown name line edit
-        self.markdownNameLineEdit = QLineEdit(self.entry.get('markdown_name', ''), parent=self)
-        self.markdownNameLineEdit.setPlaceholderText('Enter markdown pattern')
-        self.markdownNameLineEdit.textChanged.connect(self.on_markdown_name_change)
-        form.addRow('Markdown Name', self.markdownNameLineEdit)
+        # ...aggregate
+        form.addRow('Aggregate', SimpleComboBoxPropertyWidget(
+            'aggregate',
+            self.entry,
+            ['min', 'max', 'cnt', 'cnt_d', 'array', 'array_d'],
+            placeholder='Select aggregate function, if desired',
+            parent=self
+        ))
 
-        # ...comment line edit
-        self.commentLineEdit = QLineEdit(self.entry.get('comment', ''), parent=self)
-        self.commentLineEdit.setPlaceholderText('Enter plain text')
-        self.commentLineEdit.textChanged.connect(self.on_comment_change)
-        form.addRow('Comment', self.commentLineEdit)
-
-        # ...comment_display combobox
-        self.commentDisplayComboBox = QComboBox(parent=self)
-        self.commentDisplayComboBox.setPlaceholderText('Select comment display mode')
-        self.commentDisplayComboBox.insertItems(0, ['', 'inline', 'tooltip'])
-        self.commentDisplayComboBox.setCurrentIndex(
-            self.commentDisplayComboBox.findText(self.entry.get('comment_display', '')) or -1
-        )
-        self.commentDisplayComboBox.currentIndexChanged.connect(self.on_comment_display_change)
-        form.addRow('Comment Display', self.commentDisplayComboBox)
+        # ...array options
+        # todo
 
         # -- Display attributes --
 
         # ...markdown display line edit
-        self.markdownPatternLineEdit = QTextEdit(display.get('markdown_display', ''), parent=self)
+        self.markdownPatternLineEdit = QTextEdit(display.get('markdown_pattern', ''), parent=self)
         self.markdownPatternLineEdit.textChanged.connect(self.on_markdown_pattern_change)
         self.markdownPatternLineEdit.setPlaceholderText('Enter markdown pattern')
         self.markdownPatternLineEdit.setText(display.get('markdown_pattern', ''))
@@ -173,64 +183,6 @@ class PseudoColumnEditWidget(QGroupBox):
         """Handles changes to the `sourcekey` combobox.
         """
         self.sourceEntry.setEnabled(__sourcekey__ not in self.entry)
-
-    @pyqtSlot()
-    def on_entity_clicked(self):
-        """Handler for the `entity` checkbox field.
-        """
-        if self.disableEntityModeCheckbox.isChecked():
-            self.entry['entity'] = False
-        elif 'entity' in self.entry:
-            del self.entry['entity']
-
-    @pyqtSlot()
-    def on_self_link_clicked(self):
-        """Handles the `self_link` checkbox state.
-        """
-        if self.selfLinkCheckbox.isChecked():
-            self.entry['self_link'] = True
-        elif 'self_link' in self.entry:
-            del self.entry['self_link']
-
-    @pyqtSlot()
-    def on_aggregate_change(self):
-        """Handles `aggregates` combobox changes.
-        """
-        aggregate = self.aggregateComboBox.currentText()
-        if aggregate:
-            self.entry['aggregate'] = aggregate
-        elif 'aggregate' in self.entry:
-            del self.entry['aggregate']
-
-    @pyqtSlot()
-    def on_markdown_name_change(self):
-        """Handles changes to the `markdown_name` field."""
-
-        markdown_name = self.markdownNameLineEdit.text()
-        if markdown_name:
-            self.entry['markdown_name'] = markdown_name
-        elif 'markdown_name' in self.entry:
-            del self.entry['markdown_name']
-
-    @pyqtSlot()
-    def on_comment_change(self):
-        """Handles changes to the `comment` field."""
-
-        comment = self.commentLineEdit.text()
-        if comment:
-            self.entry['comment'] = comment
-        elif 'comment' in self.entry:
-            del self.entry['comment']
-
-    @pyqtSlot()
-    def on_comment_display_change(self):
-        """Handles changes to the `comment_display` combobox.
-        """
-        comment_display = self.commentDisplayComboBox.currentText()
-        if comment_display:
-            self.entry['comment_display'] = comment_display
-        elif 'comment_display' in self.entry:
-            del self.entry['comment_display']
 
     def _set_display_value(self, cond: bool, key: str, value):
         """Conditionally, set the value of the display property or erase it from pseudo-column entry.
