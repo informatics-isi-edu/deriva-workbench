@@ -1,7 +1,7 @@
 """Schema browser widget.
 """
 from PyQt5.QtCore import Qt, pyqtSlot, pyqtSignal, QModelIndex
-from PyQt5.QtWidgets import QLabel, QVBoxLayout, QTreeView, QWidget
+from PyQt5.QtWidgets import QVBoxLayout, QTreeView, QWidget, QGroupBox
 from PyQt5.Qt import QStandardItemModel, QStandardItem
 from PyQt5.QtGui import QFont, QColor
 
@@ -26,26 +26,23 @@ class _SchemaBrowserItem(QStandardItem):
             self.setForeground(color)
 
 
-class SchemaBrowser(QWidget):
+class SchemaBrowser(QGroupBox):
 
     clicked = pyqtSignal()
     doubleClicked = pyqtSignal()
 
-    def __init__(self):
-        super(SchemaBrowser, self).__init__()
-
-        self.treeView = QTreeView()
-        self.treeView.setHeaderHidden(True)
-
-        vlayout = QVBoxLayout()
-        vlayout.setContentsMargins(0, 0, 0, 0)
-
-        vlayout.addWidget(QLabel('Schema Browser'))
-        vlayout.addWidget(self.treeView)
-
-        self.setLayout(vlayout)
+    def __init__(self, parent: QWidget = None):
+        super(SchemaBrowser, self).__init__('Schema Browser', parent=parent)
         self.model = None
         self.current_selection = None
+        self.treeView = QTreeView(parent=self)
+        self.treeView.setHeaderHidden(True)
+
+        # layout
+        vlayout = QVBoxLayout(self)
+        vlayout.setContentsMargins(0, 0, 0, 0)
+        vlayout.addWidget(self.treeView)
+        self.setLayout(vlayout)
 
     def setModel(self, model):
         self.model = model
