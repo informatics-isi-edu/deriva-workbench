@@ -1,11 +1,20 @@
 """Workbench configuration options dialog.
 """
+import os
 import re
 from PyQt5.QtCore import Qt, pyqtSlot
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, \
-    QGroupBox, QComboBox, QCheckBox, QMessageBox, QDialogButtonBox, QFormLayout
+    QGroupBox, QComboBox, QCheckBox, QMessageBox, QDialogButtonBox, QFormLayout, QFileDialog
 from deriva.core import stob
 
+__servers__ = 'servers'
+__deboog__ = 'debug'
+__host__ = 'host'
+__desc__ = 'desc'
+__catalog_id__ = 'catalog_id'
+__directory__ = 'directory'
+__default__ = 'default'
+__cookie_persistence__ = 'cookie_persistence'
 
 def _warningMessageBox(parent, text, detail):
     """Displays a warning message.
@@ -22,9 +31,9 @@ def _server_display_name(server):
     """Returns a display name for the server entry.
     """
     return "%s [host: %s, catalog id: %s]" % (
-        server.get("desc", "none"),
-        server.get("host", "none"),
-        server.get("catalog_id", "none")
+        server.get(__desc__, "none"),
+        server.get(__host__, "none"),
+        server.get(__catalog_id__, "none")
     )
 
 
@@ -43,16 +52,16 @@ class OptionsDialog(QDialog):
         assert selected is None or isinstance(selected, dict), "Invalid selected server configuration"
 
         # Window and title
-        self.setWindowTitle("Configuration Options")
+        self.setWindowTitle(self.tr("Configuration Options"))
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
         self.setMinimumWidth(600)
         layout = QVBoxLayout(self)
         layout.addStretch(1)
 
         # Servers Group Box
-        serversGroupBox = QGroupBox("Servers", self)
+        serversGroupBox = QGroupBox(self.tr("Servers"), self)
         serversLayout = QHBoxLayout()
-        serversLayout.addWidget(QLabel("Server"))
+        serversLayout.addWidget(QLabel(self.tr("Server")))
         # ...combo box
         self.serverComboBox = QComboBox()
         self.serverComboBox.setEditable(False)
@@ -60,15 +69,15 @@ class OptionsDialog(QDialog):
         serversLayout.addWidget(self.serverComboBox)
         serversLayout.addStretch(1)
         # ...add button
-        addServerButton = QPushButton("Add", self)
+        addServerButton = QPushButton(self.tr("Add"), self)
         addServerButton.clicked.connect(self.onServerAdd)
         serversLayout.addWidget(addServerButton)
         # ...edit button
-        self.editServerButton = QPushButton("Edit", self)
+        self.editServerButton = QPushButton(self.tr("Edit"), self)
         self.editServerButton.clicked.connect(self.onServerEdit)
         serversLayout.addWidget(self.editServerButton)
         # ...remove button
-        self.removeServerButton = QPushButton("Remove", self)
+        self.removeServerButton = QPushButton(self.tr("Remove"), self)
         self.removeServerButton.clicked.connect(self.onServerRemove)
         serversLayout.addWidget(self.removeServerButton)
         # ...groupbox layout
@@ -76,7 +85,7 @@ class OptionsDialog(QDialog):
         layout.addWidget(serversGroupBox)
 
         # Populate servers from configuration
-        servers = config.get('servers', [])
+        servers = config.get(__servers__, [])
         if not servers:
             self.editServerButton.setEnabled(False)
             self.removeServerButton.setEnabled(False)
@@ -84,19 +93,19 @@ class OptionsDialog(QDialog):
             index = selected_index = default_index = 0
             for server in servers:
                 self.serverComboBox.insertItem(index, _server_display_name(server), server.copy())
-                if selected and not selected_index and all(server.get(key) == selected.get(key) for key in ['host', 'catalog_id']):
+                if selected and not selected_index and all(server.get(key) == selected.get(key) for key in [__host__, __catalog_id__]):
                     selected_index = index
-                if not default_index and server.get("default", False):
+                if not default_index and server.get(__default__, False):
                     default_index = index
                 index += 1
             self.editServerButton.setEnabled(index > 0)
             self.serverComboBox.setCurrentIndex(selected_index or default_index)
 
         # Miscellaneous Group Box
-        miscGroupBox = QGroupBox("Miscellaneous", self)
+        miscGroupBox = QGroupBox(self.tr("Miscellaneous"), self)
         miscLayout = QHBoxLayout()
-        self.debugCheckBox = QCheckBox("Enable debug logging")
-        self.debugCheckBox.setChecked(config.get("debug", False))
+        self.debugCheckBox = QCheckBox(self.tr("Enable debug logging"))
+        self.debugCheckBox.setChecked(config.get(__deboog__, False))
         miscLayout.addWidget(self.debugCheckBox)
         miscGroupBox.setLayout(miscLayout)
         layout.addWidget(miscGroupBox)
@@ -111,8 +120,8 @@ class OptionsDialog(QDialog):
     def config(self):
         """Configuration results."""
         return {
-            'debug': self.debugCheckBox.isChecked(),
-            'servers': [
+            __deboog__: self.debugCheckBox.isChecked(),
+            __servers__: [
                 self.serverComboBox.itemData(i, Qt.UserRole) for i in range(self.serverComboBox.count())
             ]
         }
@@ -136,9 +145,9 @@ class OptionsDialog(QDialog):
             # check for identical entry
             index = self.serverComboBox.findText(_server_display_name(server), Qt.MatchExactly)
             if index > -1:
-                _warningMessageBox(self.parent(), "Server entry already exists!",
-                                  "A connection configuration for this hostname already exists. "
-                                  "Please edit that configuration directly if you wish to make changes to it.")
+                _warningMessageBox(self.parent(), self.tr("Server entry already exists!"),
+                                   "A connection configuration for this hostname already exists. "
+                                   "Please edit that configuration directly if you wish to make changes to it.")
                 return
 
             # update ui controls
@@ -169,7 +178,7 @@ class OptionsDialog(QDialog):
         # ...set next default
         for x in range(self.serverComboBox.count()):
             current = self.serverComboBox.itemData(x, Qt.UserRole)
-            if current["default"] is True:
+            if current[__default__] is True:
                 self.serverComboBox.setCurrentIndex(x)
 
         # Disable server edit button if none left
@@ -181,47 +190,62 @@ class OptionsDialog(QDialog):
 class ServerDialog(QDialog):
     """Server settings configuration dialog.
     """
+
     def __init__(self, parent, server):
         super(ServerDialog, self).__init__(parent)
         assert server is not None and isinstance(server, dict)
         self.server = server
 
         # window title and layout
-        self.setWindowTitle("Server Configuration")
+        self.setWindowTitle(self.tr("Server Configuration"))
         self.setMinimumWidth(400)
         layout = QVBoxLayout(self)
         self.setLayout(layout)
 
         # Server group box
         serversLayout = QFormLayout(self)
-        self.serverGroupBox = QGroupBox("Server connection settings", self)
+        self.serverGroupBox = QGroupBox(self.tr("Server Connection Settings"), self)
         self.serverGroupBox.setLayout(serversLayout)
         layout.addWidget(self.serverGroupBox)
         # ...hostname
         self.hostnameTextBox = QLineEdit()
-        self.hostnameTextBox.setText(server.get("host", ""))
+        self.hostnameTextBox.setText(server.get(__host__, ""))
         serversLayout.addRow("Host", self.hostnameTextBox)
         # ...description
         self.descriptionTextBox = QLineEdit()
-        self.descriptionTextBox.setText(server.get("desc", ""))
+        self.descriptionTextBox.setText(server.get(__desc__, ""))
         serversLayout.addRow("Description", self.descriptionTextBox)
         # ...catalog id
         self.catalogIDTextBox = QLineEdit()
-        self.catalogIDTextBox.setText(str(server.get("catalog_id", 1)))
+        self.catalogIDTextBox.setText(str(server.get(__catalog_id__, 1)))
         serversLayout.addRow("Catalog ID", self.catalogIDTextBox)
 
+        # Save/Restore location group box
+        saveLocationGroupBox = QGroupBox("Save and Restore Directory", parent=self)
+        saveLocationLayout = QHBoxLayout(saveLocationGroupBox)
+        saveLocationGroupBox.setLayout(saveLocationLayout)
+        layout.addWidget(saveLocationGroupBox)
+        # ...path
+        self.pathLine = QLineEdit(server.get(__directory__), saveLocationGroupBox)
+        self.pathLine.setReadOnly(True)
+        saveLocationLayout.addWidget(self.pathLine)
+        # ...browse
+        browseButton = QPushButton(self.tr("Browse"), parent=saveLocationGroupBox)
+        browseButton.clicked.connect(self._on_browseButton_clicked)
+        saveLocationLayout.addWidget(browseButton)
+
         # Options group box
-        self.serverOptionsGroupBox = QGroupBox("Options", self)
+        self.serverOptionsGroupBox = QGroupBox(self.tr("Options"), self)
         optionsLayout = QHBoxLayout()
         self.serverOptionsGroupBox.setLayout(optionsLayout)
         layout.addWidget(self.serverOptionsGroupBox)
         # ...default
-        self.defaultServer = QCheckBox("Set as &Default", parent)
-        self.defaultServer.setChecked(stob(server.get("default", False)))
+        self.defaultServer = QCheckBox(self.tr("Set as &Default"), parent)
+        self.defaultServer.setChecked(stob(server.get(__default__, False)))
         optionsLayout.addWidget(self.defaultServer)
         # ...cookie persistence
-        self.cookie_persistence = QCheckBox("&Stay logged in", parent)
-        self.cookie_persistence.setChecked(stob(server.get("cookie_persistence", False)))
+        self.cookie_persistence = QCheckBox(self.tr("&Stay logged in"), parent)
+        self.cookie_persistence.setChecked(stob(server.get(__cookie_persistence__, False)))
         optionsLayout.addWidget(self.cookie_persistence)
 
         # Button Box
@@ -230,6 +254,20 @@ class ServerDialog(QDialog):
         buttonBox.rejected.connect(self.reject)
         layout.addWidget(buttonBox)
 
+    @pyqtSlot()
+    def _on_browseButton_clicked(self):
+        """Handle browse button clicked event.
+        """
+        path = QFileDialog.getExistingDirectory(
+            parent=self,
+            caption=self.tr("Select Directory"),
+            directory=self.pathLine.text(),
+            options=QFileDialog.ShowDirsOnly)
+
+        if path:
+            self.pathLine.setText(os.path.normpath(path))
+
+
     def accept(self):
         """Handle dialog accept.
         """
@@ -237,30 +275,43 @@ class ServerDialog(QDialog):
         host = self.hostnameTextBox.text()
         hostname = re.sub("(?i)^.*https?://", '', host)
         if not hostname:
-            _warningMessageBox(self.parent(), "Please enter a valid hostname.",
-                              "For example: \'www.host.com\' or \'localhost\', etc.")
+            _warningMessageBox(self.parent(),
+                               self.tr("Please enter a valid hostname."),
+                               "For example: \'www.host.com\' or \'localhost\', etc.")
             return False
 
         # validate catalog identifier
         try:
             catalog_id = int(self.catalogIDTextBox.text())
-            self.server["catalog_id"] = catalog_id
+            self.server[__catalog_id__] = catalog_id
         except ValueError:
-            _warningMessageBox(self.parent(), "Please enter a valid catalog identifier.",
-                              "A catalog identifier should be a number such as \'1\', \'1138\', etc.")
+            _warningMessageBox(self.parent(),
+                               self.tr("Please enter a valid catalog identifier."),
+                               "A catalog identifier should be a number such as \'1\', \'1138\', etc.")
             return False
 
         # validate description
         desc = self.descriptionTextBox.text()
         if not desc:
-            _warningMessageBox(self.parent(), "Please enter a short description.",
-                              "The short description is used throughout the application to help you quickly identify the server connection.")
+            _warningMessageBox(self.parent(),
+                               self.tr("Please enter a short description."),
+                               "The short description is used throughout the application to help you quickly identify "
+                               "the server connection.")
+            return False
+
+        # validate path
+        path = self.pathLine.text()
+        if not path:
+            _warningMessageBox(self.parent(),
+                               self.tr("Please pick a directory for local save and restore"),
+                               "The directory is used to save and restore annotations from a local copy on disk.")
             return False
 
         # take checkbox settings
-        self.server["host"] = hostname
-        self.server["catalog_id"] = catalog_id
-        self.server["desc"] = desc
-        self.server["default"] = self.defaultServer.isChecked()
-        self.server["cookie_persistence"] = self.cookie_persistence.isChecked()
+        self.server[__host__] = hostname
+        self.server[__catalog_id__] = catalog_id
+        self.server[__desc__] = desc
+        self.server[__directory__] = path
+        self.server[__default__] = self.defaultServer.isChecked()
+        self.server[__cookie_persistence__] = self.cookie_persistence.isChecked()
         super(ServerDialog, self).accept()
