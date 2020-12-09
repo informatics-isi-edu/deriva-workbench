@@ -1,12 +1,16 @@
 """Pseudo-Column editor widgets.
 """
 import logging
+import sys
 from PyQt5.QtCore import pyqtSlot, pyqtSignal
-from PyQt5.QtWidgets import QGroupBox, QWidget, QFormLayout, QComboBox, QLineEdit, QCheckBox, QTextEdit, QVBoxLayout, \
-    QListWidget, QHBoxLayout, QPushButton, QTabWidget
+from PyQt5.QtGui import QIntValidator
+from PyQt5.QtWidgets import QWidget, QFormLayout, QComboBox, QVBoxLayout, QListWidget, QHBoxLayout, QPushButton, \
+    QTabWidget, QFrame
 from deriva.core import ermrest_model as _erm, tag as _tag
-from .common import SubsetSelectionWidget, source_component_to_str, constraint_name, set_value_or_del_key, SimpleTextPropertyWidget, SimpleComboBoxPropertyWidget, MultipleChoicePropertyWidget, SimpleBooleanPropertyWidget, CommentDisplayWidget, SimpleNestedPropertyManager
+from .common import source_component_to_str, constraint_name, SimpleTextPropertyWidget, SimpleComboBoxPropertyWidget, \
+    MultipleChoicePropertyWidget, SimpleBooleanPropertyWidget, CommentDisplayWidget, SimpleNestedPropertyManager
 from .markdown_patterns import MarkdownPatternForm
+from .sortkeys import SortKeysWidget
 
 logger = logging.getLogger(__name__)
 
@@ -143,8 +147,34 @@ class PseudoColumnEditWidget(QTabWidget):
             parent=self
         ))
 
-        # ...array options
-        # todo
+        # array_options
+        array_options = SimpleNestedPropertyManager('array_options', self.entry, parent=self)
+        arrayOptions = QFrame(parent=self)
+        arrayOptions.setFrameStyle(QFrame.StyledPanel | QFrame.Plain)
+        form.addRow('Array Options', arrayOptions)
+        form = QFormLayout(arrayOptions)  # replace tab form with frame's internal form layout
+        arrayOptions.setLayout(form)
+
+        # ...array_options.order
+        arrOrder = SortKeysWidget(
+            'order',
+            array_options.value,
+            [c.name for c in table.columns],
+            parent=arrayOptions
+        )
+        arrOrder.valueChanged.connect(array_options.onValueChanged)
+        form.addRow('Order', arrOrder)
+
+        # ...array_options.max_length
+        arrMaxLen = SimpleTextPropertyWidget(
+            'max_length',
+            array_options.value,
+            placeholder='Maximum number of elements that should be displayed',
+            validator=QIntValidator(1, 2**sys.int_info.bits_per_digit),
+            parent=self
+        )
+        arrMaxLen.valueChanged.connect(array_options.onValueChanged)
+        form.addRow('Max Length', arrMaxLen)
 
         #
         # -- Display attributes --
