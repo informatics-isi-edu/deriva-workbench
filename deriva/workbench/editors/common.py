@@ -1,8 +1,7 @@
 """Widgets and utility functions shared by multiple editors.
 """
-from collections.abc import Callable
 import logging
-from typing import Any, Union
+from typing import Any, Union, Callable
 from PyQt5.QtWidgets import QVBoxLayout, QWidget, QCheckBox, QListWidget, QListWidgetItem, QComboBox, QLineEdit, \
     QButtonGroup, QBoxLayout, QHBoxLayout, QRadioButton
 from PyQt5.QtGui import QValidator
@@ -66,10 +65,10 @@ class SubsetSelectionWidget(QListWidget):
     """Widget for selecting a subset of values from a list of available options.
     """
 
-    selected_values: []
+    selected_values: list
     valueChanged = pyqtSignal()
 
-    def __init__(self, selected_values: [], all_values: [], to_string: Callable = None, parent: QWidget = None):
+    def __init__(self, selected_values: list, all_values: list, to_string: Callable = None, parent: QWidget = None):
         """Initialize the widget.
 
         :param selected_values: list of selected values
@@ -107,10 +106,10 @@ class SomeOrAllSelectorWidget(QWidget):
     """Widget for selecting all or a subset of available options.
     """
 
-    selected_values: bool or []
+    selected_values: Union[bool, list]
     valueChanged = pyqtSignal()
 
-    def __init__(self, selected_values: bool or [], all_values: [], to_string: Callable = None, parent: QWidget = None):
+    def __init__(self, selected_values: Union[bool, list], all_values: list, to_string: Callable = None, parent: QWidget = None):
         """Initialize the widget.
 
         :param selected_values: list of selected values
@@ -303,31 +302,6 @@ class SimpleComboBoxPropertyWidget(QComboBox):
             self.value
         )
         self.valueChanged.emit()
-
-
-class TemplateEngineWidget(SimpleComboBoxPropertyWidget):
-    """Widget for the `template_engine` property.
-    """
-
-    def __init__(
-            self,
-            body: dict,
-            key: str = 'template_engine',
-            choices: iter = frozenset(['handlebars', 'mustache']),
-            placeholder: str = 'Select a template engine',
-            truth_fn: Callable = bool,
-            parent: QWidget = None
-    ):
-        """Initialize the widget.
-        """
-        super(TemplateEngineWidget, self).__init__(
-            key,
-            body,
-            choices,
-            placeholder=placeholder,
-            truth_fn=truth_fn,
-            parent=parent
-        )
 
 
 class CommentDisplayWidget(SimpleComboBoxPropertyWidget):
