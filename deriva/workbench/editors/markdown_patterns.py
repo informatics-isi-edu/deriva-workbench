@@ -10,6 +10,8 @@ class MarkdownPatternForm(QWidget):
     """Markdown Pattern Form Widget.
     """
 
+    valueChanged = pyqtSignal()
+
     def __init__(
             self, field_keys: [(str, str)],
             body: dict,
@@ -43,13 +45,24 @@ class MarkdownPatternForm(QWidget):
             self._markdown_pattern_fields[key] = mdField
             self.form.addRow(label, mdField)
 
-        # template engine
+        # template_engine
         if include_template_engine:
-            self.form.addRow('Template Engine', TemplateEngineWidget(self._body, parent=self))
+            widget = TemplateEngineWidget(self._body, parent=self)
+            widget.valueChanged.connect(self._on_value_changed)
+            self.form.addRow('Template Engine', widget)
+
 
         # wait_for
         if include_wait_for:
-            self.form.addRow('Wait For', WaitForWidget(self._body, sourcekeys, parent=self))
+            widget = WaitForWidget(self._body, sourcekeys, parent=self)
+            widget.valueChanged.connect(self._on_value_changed)
+            self.form.addRow('Wait For', widget)
+
+    @property
+    def value(self) -> dict:
+        """Returns the body since it contains the set of properties managed by this widget.
+        """
+        return self._body
 
     @pyqtSlot()
     def _on_value_changed(self):
@@ -63,6 +76,7 @@ class MarkdownPatternForm(QWidget):
                 key,
                 text
             )
+            self.valueChanged.emit()
 
 
 class WaitForWidget(QWidget):

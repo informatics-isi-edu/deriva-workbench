@@ -5,7 +5,8 @@ from PyQt5.QtCore import pyqtSlot, pyqtSignal
 from PyQt5.QtWidgets import QGroupBox, QWidget, QFormLayout, QComboBox, QLineEdit, QCheckBox, QTextEdit, QVBoxLayout, \
     QListWidget, QHBoxLayout, QPushButton, QTabWidget
 from deriva.core import ermrest_model as _erm, tag as _tag
-from .common import SubsetSelectionWidget, source_component_to_str, constraint_name, set_value_or_del_key, SimpleTextPropertyWidget, SimpleComboBoxPropertyWidget, MultipleChoicePropertyWidget, SimpleBooleanPropertyWidget, CommentDisplayWidget
+from .common import SubsetSelectionWidget, source_component_to_str, constraint_name, set_value_or_del_key, SimpleTextPropertyWidget, SimpleComboBoxPropertyWidget, MultipleChoicePropertyWidget, SimpleBooleanPropertyWidget, CommentDisplayWidget, SimpleNestedPropertyManager
+from .markdown_patterns import MarkdownPatternForm
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,6 @@ class PseudoColumnEditWidget(QTabWidget):
         """
         super(PseudoColumnEditWidget, self).__init__(parent=parent)
         self.table, self.entry = table, entry
-        display = self.entry.get('display', {}) if isinstance(self.entry, dict) else {}
 
         # ...initialize entry if not starting from an existing pseudo-column
         if self.entry is None or not isinstance(self.entry, dict):
@@ -47,7 +47,9 @@ class PseudoColumnEditWidget(QTabWidget):
             # ...add blank source, if none found... will clean this up later, if not used
             self.entry['source'] = []
 
+        #
         # -- Source attributes --
+        #
         sourceTab = QWidget(parent=self)
         form = QFormLayout(sourceTab)
         sourceTab.setLayout(form)
@@ -82,7 +84,9 @@ class PseudoColumnEditWidget(QTabWidget):
         self.sourceEntry.setEnabled(enable_source_entry)
         form.addRow('Source Entry', self.sourceEntry)
 
+        #
         # -- Options --
+        #
         optionsTab = QWidget(parent=self)
         form = QFormLayout(optionsTab)
         optionsTab.setLayout(form)
@@ -142,128 +146,51 @@ class PseudoColumnEditWidget(QTabWidget):
         # ...array options
         # todo
 
+        #
         # -- Display attributes --
-        displayTab = QWidget(parent=self)
-        form = QFormLayout(displayTab)
-        displayTab.setLayout(form)
-        self.addTab(displayTab, 'Display')
-
-        # ...markdown display line edit
-        self.markdownPatternLineEdit = QTextEdit(display.get('markdown_pattern', ''), parent=self)
-        self.markdownPatternLineEdit.textChanged.connect(self.on_markdown_pattern_change)
-        self.markdownPatternLineEdit.setPlaceholderText('Enter markdown pattern')
-        self.markdownPatternLineEdit.setText(display.get('markdown_pattern', ''))
-        form.addRow('Markdown Display', self.markdownPatternLineEdit)
-
-        # ...template engine
-        self.templateEngineComboBox = QComboBox(parent=self)
-        self.templateEngineComboBox.addItems(['', 'handlebars', 'mustache'])
-        self.templateEngineComboBox.setPlaceholderText('Select a template engine')
-        self.templateEngineComboBox.setCurrentIndex(
-            self.templateEngineComboBox.findText(display.get('template_engine', '')) or -1
+        #
+        display = SimpleNestedPropertyManager('display', self.entry, parent=self)
+        # ...markdown pattern form widget used as the base widget for this tab
+        markdownPattern = MarkdownPatternForm(
+            [('markdown_pattern', 'Markdown Pattern')],
+            display.value,
+            include_template_engine=True,
+            include_wait_for=True,
+            sourcekeys=sourcekeys,
+            parent=self
         )
-        self.templateEngineComboBox.currentIndexChanged.connect(self.on_template_engine_changed)
-        form.addRow('Template Engine', self.templateEngineComboBox)
-
-        # ...wait for widget
-        self.waitForWidget = SubsetSelectionWidget(display.get('wait_for', []), sourcekeys, parent=self)
-        self.waitForWidget.valueChanged.connect(self.on_wait_for_changed)
-        form.addRow('Wait For', self.waitForWidget)
+        markdownPattern.valueChanged.connect(display.onValueChanged)
+        self.addTab(markdownPattern, 'Display')
+        form = markdownPattern.form  # extend the markdown pattern form widget
 
         # ...show_foreign_key_link checkbox
-        self.disableForeignKeyLinkCheckBox = QCheckBox('Disable outbound foreign key link', parent=self)
-        self.disableForeignKeyLinkCheckBox.setChecked(not display.get('show_foreign_key_link', True))
-        self.disableForeignKeyLinkCheckBox.clicked.connect(self.on_show_foreign_key_link_clicked)
-        form.addRow('FK Link', self.disableForeignKeyLinkCheckBox)
+        fkeyLink = MultipleChoicePropertyWidget(
+            'show_foreign_key_link',
+            display.value,
+            {
+                'Inherited behavior of outbound foreign key display': None,
+                'Avoid adding extra link to the foreign key display': False
+            },
+            parent=self
+        )
+        fkeyLink.valueChanged.connect(display.onValueChanged)
+        form.addRow('Show FK Link', fkeyLink)
 
         # ...array_ux_mode combobox
-        self.arrayUXModeComboBox = QComboBox(parent=self)
-        self.arrayUXModeComboBox.addItems(['', 'olist', 'ulist', 'csv', 'raw'])
-        self.arrayUXModeComboBox.setPlaceholderText('Select a UX mode for aggregate results')
-        self.arrayUXModeComboBox.setCurrentIndex(
-            self.arrayUXModeComboBox.findText(display.get('array_ux_mode', '')) or -1
+        arrayUXMode = SimpleComboBoxPropertyWidget(
+            'array_ux_mode',
+            display.value,
+            ['olist', 'ulist', 'csv', 'raw'],
+            placeholder='Select a UX mode for aggregate results',
+            parent=self
         )
-        self.arrayUXModeComboBox.currentIndexChanged.connect(self.on_array_ux_mode_changed)
-        form.addRow('Array UX Mode', self.arrayUXModeComboBox)
+        form.addRow('Array UX Mode', arrayUXMode)
 
     @pyqtSlot()
     def on_sourcekey_valueChanged(self):
         """Handles changes to the `sourcekey` combobox.
         """
         self.sourceEntry.setEnabled(__sourcekey__ not in self.entry)
-
-    def _set_display_value(self, cond: bool, key: str, value):
-        """Conditionally, set the value of the display property or erase it from pseudo-column entry.
-
-        :param cond: indicates if the key should be set to the value or dropped from the display dictionary
-        :param key: display dictionary key (i.e., 'wait_for')
-        :param value: valid value for the key
-        """
-        display = self.entry.get('display', {})
-
-        # set or delete value
-        set_value_or_del_key(display, cond, key, value)
-
-        # update or delete display
-        if display:
-            self.entry['display'] = display
-        elif 'display' in self.entry:
-            del self.entry['display']
-
-    @pyqtSlot()
-    def on_markdown_pattern_change(self):
-        """Handles changes to the `markdown_pattern` text field.
-        """
-        markdown_pattern = self.markdownPatternLineEdit.toPlainText()
-        self._set_display_value(
-            bool(markdown_pattern),
-            'markdown_pattern',
-            markdown_pattern
-        )
-
-    @pyqtSlot()
-    def on_template_engine_changed(self):
-        """Handles changes to the `template_engine` combobox.
-        """
-        template_engine = self.templateEngineComboBox.currentText()
-        self._set_display_value(
-            template_engine in ['handlebars', 'mustache'],
-            'template_engine',
-            template_engine
-        )
-
-    @pyqtSlot()
-    def on_wait_for_changed(self):
-        """Handles changes to the `wait_for` widget.
-        """
-        wait_for = self.waitForWidget.selected_values
-        self._set_display_value(
-            bool(wait_for),
-            'wait_for',
-            wait_for
-        )
-
-    @pyqtSlot()
-    def on_show_foreign_key_link_clicked(self):
-        """Handles `show_foreign_key_link` changes.
-        """
-        show_foreign_key_link = not self.disableForeignKeyLinkCheckBox.isChecked()
-        self._set_display_value(
-            not show_foreign_key_link,
-            'show_foreign_key_link',
-            show_foreign_key_link
-        )
-
-    @pyqtSlot()
-    def on_array_ux_mode_changed(self):
-        """Handles changes to the `array_ux_mode`.
-        """
-        array_ux_mode = self.arrayUXModeComboBox.currentText()
-        self._set_display_value(
-            array_ux_mode != '',
-            'array_ux_mode',
-            array_ux_mode
-        )
 
 
 class SourceEntryWidget(QWidget):
