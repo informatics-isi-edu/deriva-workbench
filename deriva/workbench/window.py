@@ -15,7 +15,8 @@ from . import __version__
 from .options import OptionsDialog
 from .browser import SchemaBrowser
 from .editor import SchemaEditor
-from .tasks import SessionQueryTask, FetchCatalogModelTask, ModelApplyTask, ValidateAnnotationsTask
+from .tasks import SessionQueryTask, FetchCatalogModelTask, ModelApplyTask, ValidateAnnotationsTask, \
+    SaveAnnotationsTask, RestoreAnnotationsTask
 
 
 class WorkbenchWindow(QMainWindow):
@@ -65,8 +66,12 @@ class WorkbenchWindow(QMainWindow):
     def _on_browser_clicked(self):
         if self.ui.browser.current_selection and hasattr(self.ui.browser.current_selection, 'annotations'):
             self.ui.actionValidate.setEnabled(True)
+            self.ui.actionSaveAnnotations.setEnabled(True)
+            self.ui.actionRestoreAnnotations.setEnabled(True)
         else:
             self.ui.actionValidate.setEnabled(False)
+            self.ui.actionSaveAnnotations.setEnabled(False)
+            self.ui.actionRestoreAnnotations.setEnabled(False)
 
     def configure(self, hostname, catalog_id):
         """Configures the connection properties.
@@ -179,23 +184,26 @@ class WorkbenchWindow(QMainWindow):
     def enableControls(self):
         self.ui.actionUpdate.setEnabled(self.connection.get("catalog") is not None and self.identity is not None)  # and self.auth_window.authenticated())
         self.ui.actionRefresh.setEnabled(self.connection.get("catalog") is not None)
-        self.ui.actionValidate.setEnabled(hasattr(self.ui.browser.current_selection, 'annotations'))
+        has_annotations = hasattr(self.ui.browser.current_selection, 'annotations')
+        self.ui.actionValidate.setEnabled(has_annotations)
+        self.ui.actionSaveAnnotations.setEnabled(has_annotations)
+        self.ui.actionRestoreAnnotations.setEnabled(has_annotations)
         self.ui.actionCancel.setEnabled(False)
         self.ui.actionOptions.setEnabled(True)
         self.ui.actionLogin.setEnabled(self.identity is None)  # not self.auth_window.authenticated())
         self.ui.actionLogout.setEnabled(self.identity is not None)  # self.auth_window.authenticated())
         self.ui.actionExit.setEnabled(True)
-        # self.ui.browseButton.setEnabled(True)
 
     def disableControls(self):
         self.ui.actionUpdate.setEnabled(False)
         self.ui.actionRefresh.setEnabled(False)
         self.ui.actionValidate.setEnabled(False)
+        self.ui.actionSaveAnnotations.setEnabled(False)
+        self.ui.actionRestoreAnnotations.setEnabled(False)
         self.ui.actionOptions.setEnabled(False)
         self.ui.actionLogin.setEnabled(False)
         self.ui.actionLogout.setEnabled(False)
         self.ui.actionExit.setEnabled(False)
-        # self.ui.browseButton.setEnabled(False)
 
     def closeEvent(self, event=None):
         """Window close event handler.
@@ -261,6 +269,10 @@ class WorkbenchWindow(QMainWindow):
         else:
             self.updateStatus("Login required.")
 
+    #
+    # actionRefresh
+    #
+
     @pyqtSlot()
     def on_actionRefresh_triggered(self):
         # check if connected to a catalog
@@ -289,6 +301,10 @@ class WorkbenchWindow(QMainWindow):
             self.resetUI("Fetched catalog model...")
         else:
             self.resetUI(status, detail, success)
+
+    #
+    # actionValidate
+    #
 
     @pyqtSlot()
     def on_actionValidate_triggered(self):
@@ -334,6 +350,10 @@ class WorkbenchWindow(QMainWindow):
         else:
             self.resetUI(status, detail, success)
 
+    #
+    # actionUpdate
+    #
+
     @pyqtSlot()
     def on_actionUpdate_triggered(self):
         model = self.ui.browser.model
@@ -351,6 +371,136 @@ class WorkbenchWindow(QMainWindow):
         else:
             self.resetUI(status, detail, success)
 
+    #
+    # actionSaveAnnotations
+    #
+
+    @pyqtSlot()
+    def on_actionSaveAnnotations_triggered(self):
+        """Handles actionSaveAnnotations event.
+        """
+        error = None
+
+        # check if connected to a catalog
+        if not self.connection.get("catalog"):
+            error = self.tr("Not connected to a catalog.")
+
+        # check if directory specified
+        if not self.connection.get("directory"):
+            error = self.tr("No directory to save and restore. Go to options and edit this server configuration.")
+
+        # get current selected model obj
+        model_object = self.ui.browser.current_selection
+        if not hasattr(model_object, 'annotations'):
+            error = self.tr("Cannot save annotations. Current selected object does not have 'annotations' property.")
+
+        if error:
+            QMessageBox.critical(
+                self,
+                self.tr("Failed to Save Annotations"),
+                error
+            )
+            self.updateStatus(error)
+        else:
+            # initiate save
+            self.saveAnnotations(model_object)
+
+    def saveAnnotations(self, model_object):
+        """Serializes and saves annotations to local directory.
+
+        :param model_object: a valid ermrest model object with 'annotations'
+        """
+        assert hasattr(model_object, 'annotations'), "Current selection does not have 'annotations'."
+        task = SaveAnnotationsTask(model_object, self.connection)
+        task.status_update_signal.connect(self.onSaveAnnotationsResult)
+        task.start()
+        qApp.setOverrideCursor(Qt.WaitCursor)
+        self.ui.actionCancel.setEnabled(True)
+
+    @pyqtSlot(bool, str, str, object)
+    def onSaveAnnotationsResult(self, success, status, detail, result):
+        """Handles save annotations results.
+        """
+        self.restoreCursor()
+        if success:
+            msg = self.tr("Annotations saved successfully")
+            QMessageBox.information(
+                self,
+                self.tr("Task Results"),
+                msg,
+                QMessageBox.Ok
+            )
+            self.resetUI(msg)
+        else:
+            self.resetUI(status, detail, success)
+
+    #
+    # actionRestoreAnnotations
+    #
+
+    @pyqtSlot()
+    def on_actionRestoreAnnotations_triggered(self):
+        """Handles actionRestoreAnnotations event.
+        """
+        error = None
+
+        # check if connected to a catalog
+        if not self.connection.get("catalog"):
+            error = self.tr("Not connected to a catalog.")
+
+        # check if directory specified
+        if not self.connection.get("directory"):
+            error = self.tr("No directory to save and restore. Go to options and edit this server configuration.")
+
+        # get current selected model obj
+        model_object = self.ui.browser.current_selection
+        if not hasattr(model_object, 'annotations'):
+            error = self.tr("Cannot restore annotations. Current selected object does not have 'annotations' property.")
+
+        if error:
+            QMessageBox.critical(
+                self,
+                self.tr("Failed to Restore Annotations"),
+                error
+            )
+            self.updateStatus(error)
+        else:
+            # initiate restore
+            self.restoreAnnotations(model_object)
+
+    def restoreAnnotations(self, model_object):
+        """Deserializes and restores annotations from local directory.
+
+        :param model_object: a valid ermrest model object with 'annotations'
+        """
+        assert hasattr(model_object, 'annotations'), "Current selection does not have 'annotations'."
+        task = RestoreAnnotationsTask(model_object, self.connection)
+        task.status_update_signal.connect(self.onRestoreAnnotationsResult)
+        task.start()
+        qApp.setOverrideCursor(Qt.WaitCursor)
+        self.ui.actionCancel.setEnabled(True)
+
+    @pyqtSlot(bool, str, str, object)
+    def onRestoreAnnotationsResult(self, success, status, detail, result):
+        """Handles restore annotations results.
+        """
+        self.restoreCursor()
+        if success:
+            msg = self.tr("Annotations restored successfully")
+            QMessageBox.information(
+                self,
+                self.tr("Task Results"),
+                msg,
+                QMessageBox.Ok
+            )
+            self.resetUI(msg)
+        else:
+            self.resetUI(status, detail, success)
+
+    #
+    # actionCancel
+    #
+
     @pyqtSlot()
     def on_actionCancel_triggered(self):
         self.cancelTasks()
@@ -365,6 +515,10 @@ class WorkbenchWindow(QMainWindow):
                 return
         self.auth_window.show()
         self.auth_window.login()
+
+    #
+    # actionLogout
+    #
 
     @pyqtSlot()
     def on_actionLogout_triggered(self):
@@ -395,26 +549,36 @@ class WorkbenchWindow(QMainWindow):
 
             # ...update selected connection
             selected = dialog.selected
-            if selected and (not self.connection or any(self.connection.get(key) != selected.get(key) for key in ['host', 'catalog_id'])):
-                self.updateStatus('Connecting to "%s" (catalog: %s).' % (selected['host'], str(selected['catalog_id'])))
-                # initialize connection and deriva server
-                self.connection = selected.copy()
-                self.connection["server"] = DerivaServer(self.connection.get('protocol', 'https'),
-                                                         self.connection['host'],
-                                                         credentials=get_credential(self.connection['host']))
+            if selected:
+                if not self.connection or any(self.connection.get(key) != selected.get(key) for key in ['host', 'catalog_id']):
+                    # case: new (host, catalog) combination... establish connection
+                    self.updateStatus('Connecting to "%s" (catalog: %s).' % (selected['host'], str(selected['catalog_id'])))
+                    # initialize connection and deriva server
+                    self.connection = selected.copy()
+                    self.connection["server"] = DerivaServer(self.connection.get('protocol', 'https'),
+                                                             self.connection['host'],
+                                                             credentials=get_credential(self.connection['host']))
 
-                # clear out any schema editor state
-                self.ui.browser.setModel(None)
-                self.ui.editor.data = None
+                    # clear out any schema editor state
+                    self.ui.browser.setModel(None)
+                    self.ui.editor.data = None
 
-                # begin login sequence
-                qApp.setOverrideCursor(Qt.WaitCursor)
-                self.restoreCursor()
-                if not self.checkValidServer():
-                    return
-                self.setWindowTitle("%s (%s)" % (self.ui.title, self.connection["host"]))
-                self.getNewAuthWindow()
-                self.getSession()
+                    # begin login sequence
+                    qApp.setOverrideCursor(Qt.WaitCursor)
+                    self.restoreCursor()
+                    if not self.checkValidServer():
+                        return
+                    self.setWindowTitle("%s (%s)" % (self.ui.title, self.connection["host"]))
+                    self.getNewAuthWindow()
+                    self.getSession()
+                else:
+                    # case: same (host, catalog_id)... still need to update the rest of the connection options
+                    assert isinstance(self.connection, dict), "Invalid internal connection object"
+                    self.connection.update(selected)
+
+    #
+    # actionExit
+    #
 
     @pyqtSlot()
     def on_actionExit_triggered(self):
@@ -526,6 +690,22 @@ class _WorkbenchWindowUI(object):
         self.actionValidate.setShortcut(mainWin.tr("Ctrl+I"))
         self.actionValidate.setEnabled(False)
 
+        # Save Annotations
+        self.actionSaveAnnotations = QAction(mainWin)
+        self.actionSaveAnnotations.setObjectName("actionSaveAnnotations")
+        self.actionSaveAnnotations.setText(mainWin.tr("Save"))
+        self.actionSaveAnnotations.setToolTip(mainWin.tr("Save annotations (to disk) for the currently selected model object"))
+        self.actionSaveAnnotations.setShortcut(mainWin.tr("Ctrl+S"))
+        self.actionSaveAnnotations.setEnabled(False)
+
+        # Restore Annotations
+        self.actionRestoreAnnotations = QAction(mainWin)
+        self.actionRestoreAnnotations.setObjectName("actionRestoreAnnotations")
+        self.actionRestoreAnnotations.setText(mainWin.tr("Restore"))
+        self.actionRestoreAnnotations.setToolTip(mainWin.tr("Restore annotations (from disk) for the currently selected model object"))
+        self.actionRestoreAnnotations.setShortcut(mainWin.tr("Ctrl+S"))
+        self.actionRestoreAnnotations.setEnabled(False)
+
         # Cancel
         self.actionCancel = QAction(mainWin)
         self.actionCancel.setObjectName("actionCancel")
@@ -592,6 +772,20 @@ class _WorkbenchWindowUI(object):
         # Validate
         self.mainToolBar.addAction(self.actionValidate)
         self.actionValidate.setIcon(qApp.style().standardIcon(QStyle.SP_DialogApplyButton))
+
+        # separator -------------------
+        self.mainToolBar.addSeparator()
+
+        # Save Annotations
+        self.mainToolBar.addAction(self.actionSaveAnnotations)
+        self.actionSaveAnnotations.setIcon(qApp.style().standardIcon(QStyle.SP_DialogSaveButton))
+
+        # Restore Annotations
+        self.mainToolBar.addAction(self.actionRestoreAnnotations)
+        self.actionRestoreAnnotations.setIcon(qApp.style().standardIcon(QStyle.SP_DialogOpenButton))
+
+        # separator -------------------
+        self.mainToolBar.addSeparator()
 
         # Cancel
         self.mainToolBar.addAction(self.actionCancel)

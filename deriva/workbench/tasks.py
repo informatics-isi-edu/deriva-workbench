@@ -111,3 +111,49 @@ class ValidateAnnotationsTask(WorkbenchTask):
     def validate(self):
         self.task = Task(annotation.validate, [self.model_obj], self.result_callback)
         self.start()
+
+
+class SaveAnnotationsTask(WorkbenchTask):
+    """Serialize and save annotations for the selected model object.
+    """
+
+    def __init__(self, model_obj, connection, parent=None):
+        super(SaveAnnotationsTask, self).__init__(connection, parent)
+        assert connection.get('catalog')
+        self.model_obj = model_obj
+
+    def result_callback(self, success, result):
+        self.set_status(success,
+                        "Save annotations task success." if success else "Save annotations task failed.",
+                        "" if success else format_exception(result),
+                        result if success else None)
+
+    def start(self):
+        self.task = Task(self._save_annotations, [], self.result_callback)
+        super(SaveAnnotationsTask, self).start()
+
+    def _save_annotations(self):
+        print("doing the save thang")
+
+
+class RestoreAnnotationsTask(WorkbenchTask):
+    """Serialize and Restore annotations for the selected model object.
+    """
+
+    def __init__(self, model_obj, connection, parent=None):
+        super(RestoreAnnotationsTask, self).__init__(connection, parent)
+        assert connection.get('catalog')
+        self.model_obj = model_obj
+
+    def result_callback(self, success, result):
+        self.set_status(success,
+                        "Restore annotations task success." if success else "Restore annotations task failed.",
+                        "" if success else format_exception(result),
+                        result if success else None)
+
+    def start(self):
+        self.task = Task(self._restore_annotations, [], self.result_callback)
+        super(RestoreAnnotationsTask, self).start()
+
+    def _restore_annotations(self):
+        print("doing the restore thang")
