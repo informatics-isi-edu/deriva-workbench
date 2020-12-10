@@ -1,38 +1,9 @@
 """Workbench background tasks.
 """
-from PyQt5.QtCore import QObject, pyqtSignal
 from deriva.core import format_exception, annotation
-from deriva.qt import async_execute, Task
-
-
-class WorkbenchTask(QObject):
-    """Base class for workbench tasks, based on similar class from the `deriva.qt` package.
-    """
-
-    status_update_signal = pyqtSignal(bool, str, str, object)
-    progress_update_signal = pyqtSignal(int, int)
-
-    def __init__(self, connection, parent=None):
-        super(WorkbenchTask, self).__init__(parent)
-        assert (connection is not None and isinstance(connection, dict))
-        self.connection = connection
-        self.task = None
-
-    def start(self):
-        async_execute(self.task)
-
-    def cancel(self):
-        self.task.cancel()
-
-    def set_status(self, success, status, detail, result):
-        self.status_update_signal.emit(success, status, detail, result)
-
-    def progress_callback(self, current, maximum):
-        if self.task.canceled:
-            return False
-
-        self.progress_update_signal.emit(current, maximum)
-        return True
+from deriva.qt import Task
+from .base import WorkbenchTask
+from .dump import DumpAnnotationsTask, RestoreAnnotationsTask
 
 
 class SessionQueryTask(WorkbenchTask):
@@ -111,49 +82,3 @@ class ValidateAnnotationsTask(WorkbenchTask):
     def validate(self):
         self.task = Task(annotation.validate, [self.model_obj], self.result_callback)
         self.start()
-
-
-class SaveAnnotationsTask(WorkbenchTask):
-    """Serialize and save annotations for the selected model object.
-    """
-
-    def __init__(self, model_obj, connection, parent=None):
-        super(SaveAnnotationsTask, self).__init__(connection, parent)
-        assert connection.get('catalog')
-        self.model_obj = model_obj
-
-    def result_callback(self, success, result):
-        self.set_status(success,
-                        "Save annotations task success." if success else "Save annotations task failed.",
-                        "" if success else format_exception(result),
-                        result if success else None)
-
-    def start(self):
-        self.task = Task(self._save_annotations, [], self.result_callback)
-        super(SaveAnnotationsTask, self).start()
-
-    def _save_annotations(self):
-        print("doing the save thang")
-
-
-class RestoreAnnotationsTask(WorkbenchTask):
-    """Serialize and Restore annotations for the selected model object.
-    """
-
-    def __init__(self, model_obj, connection, parent=None):
-        super(RestoreAnnotationsTask, self).__init__(connection, parent)
-        assert connection.get('catalog')
-        self.model_obj = model_obj
-
-    def result_callback(self, success, result):
-        self.set_status(success,
-                        "Restore annotations task success." if success else "Restore annotations task failed.",
-                        "" if success else format_exception(result),
-                        result if success else None)
-
-    def start(self):
-        self.task = Task(self._restore_annotations, [], self.result_callback)
-        super(RestoreAnnotationsTask, self).start()
-
-    def _restore_annotations(self):
-        print("doing the restore thang")

@@ -220,19 +220,19 @@ class ServerDialog(QDialog):
         self.catalogIDTextBox.setText(str(server.get(__catalog_id__, 1)))
         serversLayout.addRow("Catalog ID", self.catalogIDTextBox)
 
-        # Save/Restore location group box
-        saveLocationGroupBox = QGroupBox("Save and Restore Directory", parent=self)
-        saveLocationLayout = QHBoxLayout(saveLocationGroupBox)
-        saveLocationGroupBox.setLayout(saveLocationLayout)
-        layout.addWidget(saveLocationGroupBox)
+        # Dump/Restore location group box
+        dumpLocationGroupBox = QGroupBox("Dump and Restore Directory", parent=self)
+        dumpLocationLayout = QHBoxLayout(dumpLocationGroupBox)
+        dumpLocationGroupBox.setLayout(dumpLocationLayout)
+        layout.addWidget(dumpLocationGroupBox)
         # ...path
-        self.pathLine = QLineEdit(server.get(__directory__), saveLocationGroupBox)
+        self.pathLine = QLineEdit(server.get(__directory__), dumpLocationGroupBox)
         self.pathLine.setReadOnly(True)
-        saveLocationLayout.addWidget(self.pathLine)
+        dumpLocationLayout.addWidget(self.pathLine)
         # ...browse
-        browseButton = QPushButton(self.tr("Browse"), parent=saveLocationGroupBox)
+        browseButton = QPushButton(self.tr("Browse"), parent=dumpLocationGroupBox)
         browseButton.clicked.connect(self._on_browseButton_clicked)
-        saveLocationLayout.addWidget(browseButton)
+        dumpLocationLayout.addWidget(browseButton)
 
         # Options group box
         self.serverOptionsGroupBox = QGroupBox(self.tr("Options"), self)
@@ -303,8 +303,8 @@ class ServerDialog(QDialog):
         path = self.pathLine.text()
         if not path:
             _warningMessageBox(self.parent(),
-                               self.tr("Please pick a directory for local save and restore"),
-                               "The directory is used to save and restore annotations from a local copy on disk.")
+                               self.tr("Please pick a directory for local dump and restore"),
+                               "The directory is used to dump and restore annotations from a local copy on disk.")
             return False
 
         # take checkbox settings

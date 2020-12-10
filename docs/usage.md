@@ -23,7 +23,8 @@ by the DERIVA administrator.
 
 ![Server Configuration Dialog](images/server-configuration-dialog.png)
 
-Enter the host name, a memorable description, and a catalog number. Optionally, 
+Enter the host name, a memorable description, and a catalog number. Select a 
+directory location for dumping and restoring annotations. Optionally, 
 check the box to "Set as Default" if you want to connect to this server and 
 catalog by default on restart of the workbench. After clicking "OK" on the Server 
 Configuration dialog, you must click "OK" again on the Configuration Options 
@@ -197,3 +198,15 @@ for better viewing.
 At any time, you may refresh the local copy of the catalog model, and potentially discard any 
 changes that have not been updated on the remote server. To do so, use the "Refresh" button toward the left 
 in the toolbar.
+
+### 9. Dump and restore annotations
+
+You may dump and restore annotations to and from the local file system for any model object in 
+the catalog. First, you must select a model object that contains an `annotation` resource.
+
+![Dump and Restore Actions](images/toolbar-buttons-left.png)
+
+Then click on "Dump" to dump the annotations _recursively_ to the "Dump and Restore Directory" 
+configured for the server connection. Click on "Restore" to restore the annotations _recursively_ 
+from the configured directory. If a dump file is not found for a given model object in the 
+hierarchy, that object will simply be skipped and an error message logged to the log window.

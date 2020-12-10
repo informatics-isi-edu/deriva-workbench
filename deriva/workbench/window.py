@@ -16,7 +16,7 @@ from .options import OptionsDialog
 from .browser import SchemaBrowser
 from .editor import SchemaEditor
 from .tasks import SessionQueryTask, FetchCatalogModelTask, ModelApplyTask, ValidateAnnotationsTask, \
-    SaveAnnotationsTask, RestoreAnnotationsTask
+    DumpAnnotationsTask, RestoreAnnotationsTask
 
 
 class WorkbenchWindow(QMainWindow):
@@ -66,11 +66,11 @@ class WorkbenchWindow(QMainWindow):
     def _on_browser_clicked(self):
         if self.ui.browser.current_selection and hasattr(self.ui.browser.current_selection, 'annotations'):
             self.ui.actionValidate.setEnabled(True)
-            self.ui.actionSaveAnnotations.setEnabled(True)
+            self.ui.actionDumpAnnotations.setEnabled(True)
             self.ui.actionRestoreAnnotations.setEnabled(True)
         else:
             self.ui.actionValidate.setEnabled(False)
-            self.ui.actionSaveAnnotations.setEnabled(False)
+            self.ui.actionDumpAnnotations.setEnabled(False)
             self.ui.actionRestoreAnnotations.setEnabled(False)
 
     def configure(self, hostname, catalog_id):
@@ -186,7 +186,7 @@ class WorkbenchWindow(QMainWindow):
         self.ui.actionRefresh.setEnabled(self.connection.get("catalog") is not None)
         has_annotations = hasattr(self.ui.browser.current_selection, 'annotations')
         self.ui.actionValidate.setEnabled(has_annotations)
-        self.ui.actionSaveAnnotations.setEnabled(has_annotations)
+        self.ui.actionDumpAnnotations.setEnabled(has_annotations)
         self.ui.actionRestoreAnnotations.setEnabled(has_annotations)
         self.ui.actionCancel.setEnabled(False)
         self.ui.actionOptions.setEnabled(True)
@@ -198,7 +198,7 @@ class WorkbenchWindow(QMainWindow):
         self.ui.actionUpdate.setEnabled(False)
         self.ui.actionRefresh.setEnabled(False)
         self.ui.actionValidate.setEnabled(False)
-        self.ui.actionSaveAnnotations.setEnabled(False)
+        self.ui.actionDumpAnnotations.setEnabled(False)
         self.ui.actionRestoreAnnotations.setEnabled(False)
         self.ui.actionOptions.setEnabled(False)
         self.ui.actionLogin.setEnabled(False)
@@ -372,12 +372,12 @@ class WorkbenchWindow(QMainWindow):
             self.resetUI(status, detail, success)
 
     #
-    # actionSaveAnnotations
+    # actionDumpAnnotations
     #
 
     @pyqtSlot()
-    def on_actionSaveAnnotations_triggered(self):
-        """Handles actionSaveAnnotations event.
+    def on_actionDumpAnnotations_triggered(self):
+        """Handles actionDumpAnnotations event.
         """
         error = None
 
@@ -387,43 +387,42 @@ class WorkbenchWindow(QMainWindow):
 
         # check if directory specified
         if not self.connection.get("directory"):
-            error = self.tr("No directory to save and restore. Go to options and edit this server configuration.")
+            error = self.tr("No directory to dump and restore annotations. Go to options and edit this server configuration.")
 
         # get current selected model obj
         model_object = self.ui.browser.current_selection
         if not hasattr(model_object, 'annotations'):
-            error = self.tr("Cannot save annotations. Current selected object does not have 'annotations' property.")
+            error = self.tr("Cannot dump annotations. Current selected object does not have 'annotations' property.")
 
         if error:
             QMessageBox.critical(
                 self,
-                self.tr("Failed to Save Annotations"),
+                self.tr("Failed to Dump Annotations"),
                 error
             )
             self.updateStatus(error)
         else:
-            # initiate save
-            self.saveAnnotations(model_object)
+            self.dumpAnnotations(model_object)
 
-    def saveAnnotations(self, model_object):
-        """Serializes and saves annotations to local directory.
+    def dumpAnnotations(self, model_object):
+        """Dumps annotations to local directory.
 
         :param model_object: a valid ermrest model object with 'annotations'
         """
         assert hasattr(model_object, 'annotations'), "Current selection does not have 'annotations'."
-        task = SaveAnnotationsTask(model_object, self.connection)
-        task.status_update_signal.connect(self.onSaveAnnotationsResult)
+        task = DumpAnnotationsTask(model_object, self.connection)
+        task.status_update_signal.connect(self.onDumpAnnotationsResult)
         task.start()
         qApp.setOverrideCursor(Qt.WaitCursor)
         self.ui.actionCancel.setEnabled(True)
 
     @pyqtSlot(bool, str, str, object)
-    def onSaveAnnotationsResult(self, success, status, detail, result):
-        """Handles save annotations results.
+    def onDumpAnnotationsResult(self, success, status, detail, result):
+        """Handles dump annotations results.
         """
         self.restoreCursor()
         if success:
-            msg = self.tr("Annotations saved successfully")
+            msg = self.tr("Annotations dumped successfully")
             QMessageBox.information(
                 self,
                 self.tr("Task Results"),
@@ -450,7 +449,7 @@ class WorkbenchWindow(QMainWindow):
 
         # check if directory specified
         if not self.connection.get("directory"):
-            error = self.tr("No directory to save and restore. Go to options and edit this server configuration.")
+            error = self.tr("No directory to dump and restore annotations. Go to options and edit this server configuration.")
 
         # get current selected model obj
         model_object = self.ui.browser.current_selection
@@ -465,11 +464,10 @@ class WorkbenchWindow(QMainWindow):
             )
             self.updateStatus(error)
         else:
-            # initiate restore
             self.restoreAnnotations(model_object)
 
     def restoreAnnotations(self, model_object):
-        """Deserializes and restores annotations from local directory.
+        """Restores annotations from local directory.
 
         :param model_object: a valid ermrest model object with 'annotations'
         """
@@ -690,19 +688,19 @@ class _WorkbenchWindowUI(object):
         self.actionValidate.setShortcut(mainWin.tr("Ctrl+I"))
         self.actionValidate.setEnabled(False)
 
-        # Save Annotations
-        self.actionSaveAnnotations = QAction(mainWin)
-        self.actionSaveAnnotations.setObjectName("actionSaveAnnotations")
-        self.actionSaveAnnotations.setText(mainWin.tr("Save"))
-        self.actionSaveAnnotations.setToolTip(mainWin.tr("Save annotations (to disk) for the currently selected model object"))
-        self.actionSaveAnnotations.setShortcut(mainWin.tr("Ctrl+S"))
-        self.actionSaveAnnotations.setEnabled(False)
+        # Dump Annotations
+        self.actionDumpAnnotations = QAction(mainWin)
+        self.actionDumpAnnotations.setObjectName("actionDumpAnnotations")
+        self.actionDumpAnnotations.setText(mainWin.tr("Dump"))
+        self.actionDumpAnnotations.setToolTip(mainWin.tr("Dump annotations to disk for the currently selected model object hierarchy"))
+        self.actionDumpAnnotations.setShortcut(mainWin.tr("Ctrl+S"))
+        self.actionDumpAnnotations.setEnabled(False)
 
         # Restore Annotations
         self.actionRestoreAnnotations = QAction(mainWin)
         self.actionRestoreAnnotations.setObjectName("actionRestoreAnnotations")
         self.actionRestoreAnnotations.setText(mainWin.tr("Restore"))
-        self.actionRestoreAnnotations.setToolTip(mainWin.tr("Restore annotations (from disk) for the currently selected model object"))
+        self.actionRestoreAnnotations.setToolTip(mainWin.tr("Restore annotations from dump files for the currently selected model object hierarchy"))
         self.actionRestoreAnnotations.setShortcut(mainWin.tr("Ctrl+S"))
         self.actionRestoreAnnotations.setEnabled(False)
 
@@ -776,9 +774,9 @@ class _WorkbenchWindowUI(object):
         # separator -------------------
         self.mainToolBar.addSeparator()
 
-        # Save Annotations
-        self.mainToolBar.addAction(self.actionSaveAnnotations)
-        self.actionSaveAnnotations.setIcon(qApp.style().standardIcon(QStyle.SP_DialogSaveButton))
+        # Dump Annotations
+        self.mainToolBar.addAction(self.actionDumpAnnotations)
+        self.actionDumpAnnotations.setIcon(qApp.style().standardIcon(QStyle.SP_DialogSaveButton))
 
         # Restore Annotations
         self.mainToolBar.addAction(self.actionRestoreAnnotations)
