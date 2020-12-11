@@ -12,6 +12,7 @@ class JSONEditor(CodeEditor):
     def __init__(self, data=None):
         super(JSONEditor, self).__init__()
         self.highlighter = JSONSyntaxHighlighter(self.document())
+        self.setReadOnly(True)
         font = QFont()
         font.setFamily('Courier')
         font.setFixedPitch(True)
@@ -38,6 +39,7 @@ class AnnotationEditor(JSONEditor):
 
     def __init__(self, data=None):
         super(AnnotationEditor, self).__init__()
+        self.setReadOnly(False)
         self.textChanged.connect(self.on_textChanged)
         self._data = None
         self._parent = None
