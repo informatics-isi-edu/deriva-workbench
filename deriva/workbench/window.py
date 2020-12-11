@@ -60,7 +60,7 @@ class WorkbenchWindow(QMainWindow):
 
     @pyqtSlot()
     def _on_browser_itemOpened(self):
-        self.ui.editor.data = self.ui.browser.lastItemOpenned
+        self.ui.editor.data = self.ui.browser.lastItemOpened
 
     @pyqtSlot()
     def _on_browser_itemSelected(self):

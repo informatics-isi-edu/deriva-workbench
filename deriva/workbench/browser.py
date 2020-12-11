@@ -61,8 +61,7 @@ class SchemaBrowser(QGroupBox):
         :param parent: the parent widget
         """
         super(SchemaBrowser, self).__init__('Schema Browser', parent=parent)
-        self.lastItemSelected = self.lastItemOpenned = None
-        self._ermrest_model: Union[_erm.Model, None] = None
+        self.lastItemSelected = self.lastItemOpened = None
         self._treeView = self._create_treeView()
 
         # layout
@@ -93,7 +92,7 @@ class SchemaBrowser(QGroupBox):
         selection = self._treeView.selectionModel()
         selection.clear()
         selection.select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        self.lastItemSelected = self.lastItemOpenned = index.data(Qt.UserRole)
+        self.lastItemSelected = self.lastItemOpened = index.data(Qt.UserRole)
         self.itemOpened.emit()
         self.itemSelected.emit()
 
@@ -150,7 +149,7 @@ class SchemaBrowser(QGroupBox):
     def _on_double_clicked(self, index: QModelIndex):
         """Double-click handler, updates last item opened and emits signal
         """
-        self.lastItemOpenned = index.data(Qt.UserRole)
+        self.lastItemOpened = index.data(Qt.UserRole)
         self.itemOpened.emit()
 
     @pyqtSlot(QModelIndex)
@@ -167,8 +166,7 @@ class SchemaBrowser(QGroupBox):
 
         :param model: an ermrest Model instance
         """
-        self._ermrest_model = model
-        self.lastItemSelected = self.lastItemOpenned = None
+        self.lastItemSelected = self.lastItemOpened = None
 
         treeModel = QStandardItemModel()
         rootNode = treeModel.invisibleRootItem()
