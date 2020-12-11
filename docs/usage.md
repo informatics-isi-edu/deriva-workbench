@@ -216,8 +216,8 @@ for better viewing.
 ### 9. Refresh From Server and Discard Local Changes
 
 At any time, you may refresh the local copy of the catalog model, and potentially discard any 
-changes that have not been updated on the remote server. To do so, use the "Refresh" button toward the left 
-in the toolbar.
+changes that have not been updated on the remote server. To do so, use the "Refresh" button toward 
+the left in the toolbar.
 
 ### 10. Dump and Restore Annotations To/From Files
 
@@ -230,3 +230,10 @@ Then click on "Dump" to dump the annotations _recursively_ to the "Dump and Rest
 configured for the server connection. Click on "Restore" to restore the annotations _recursively_ 
 from the configured directory. If a dump file is not found for a given model object in the 
 hierarchy, that object will simply be skipped and an error message logged to the log window.
+
+The directory hierarchy will resemble the structure seen in the _Schema Browser_ window. Even if 
+you select a single table, column, etc., the annotations will be saved in a directory structure 
+according to the schema structure. Also, any non-word characters (aside from `a-zA-Z0-9_`) in the
+model element names will be replaced with `_` characters. For example, `% This Name!` will be 
+converted to `__This_Name_`. (Limitation: currently, name collisions are possible if you have 
+model elements that only differ in non-word characters.)
