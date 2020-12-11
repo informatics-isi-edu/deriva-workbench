@@ -3,6 +3,7 @@
 from PyQt5.QtWidgets import QWidget
 from deriva.core import tag, ermrest_model as _erm
 from .markdown_patterns import MarkdownPatternForm
+from .common import raise_on_invalid
 
 
 class CitationEditor(MarkdownPatternForm):
@@ -15,6 +16,7 @@ class CitationEditor(MarkdownPatternForm):
         :param table: the ermrest table that contains the citation annotation,
         :param parent: the parent widget
         """
+        raise_on_invalid(table, _erm.Table, tag.citation)
         super(CitationEditor, self).__init__(
             [
                 ('journal_pattern', 'Journal'),

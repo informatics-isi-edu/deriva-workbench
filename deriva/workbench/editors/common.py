@@ -10,6 +10,23 @@ from PyQt5.QtCore import Qt, QObject, pyqtSlot, pyqtSignal
 logger = logging.getLogger(__name__)
 
 
+def raise_on_invalid(model_obj, valid, tag: str):
+    """Raises type error for tags applied to invalid model object types.
+
+    :param model_obj: an ermrest model object
+    :param valid: one or a list of ermrest model classes
+    :param tag: the annotation tag name
+    """
+    valid_types = valid if isinstance(valid, list) else [valid]
+    if not any(isinstance(model_obj, valid_type) for valid_type in valid_types):
+        raise TypeError(
+            'The "%s" annotation should only be used on resources of type %s.' % (
+                tag,
+                ', '.join([valid_type.__name__ for valid_type in valid_types])
+            )
+        )
+
+
 def set_value_or_del_key(container: dict, cond: bool, key: str, value):
     """Conditionally, set the value of the property or delete the key from the containing dict.
 

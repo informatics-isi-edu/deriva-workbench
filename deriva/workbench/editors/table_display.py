@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget, QGroupBox, QLabel
 from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtGui import QIntValidator
 from deriva.core import tag, ermrest_model as _erm
-from .common import SimpleTextPropertyWidget, SimpleBooleanPropertyWidget
+from .common import SimpleTextPropertyWidget, SimpleBooleanPropertyWidget, raise_on_invalid
 from .markdown_patterns import MarkdownPatternForm
 from .sortkeys import SortKeysWidget
 from .tabbed_contexts import TabbedContextsWidget
@@ -19,9 +19,12 @@ class TableDisplayContextsEditor(TabbedContextsWidget):
 
     def __init__(self, table: _erm.Table, parent: QWidget = None):
         """Initialize widget.
+
+        :param table: an ermrest table instance
+        :param parent: the parent widget
         """
+        raise_on_invalid(table, _erm.Table, tag.table_display)
         super(TableDisplayContextsEditor, self).__init__(parent=parent)
-        assert isinstance(table, _erm.Table)
         self.table = table
         self.body = self.table.annotations[tag.table_display]
         self.createContextRequested.connect(self._on_creatContext)

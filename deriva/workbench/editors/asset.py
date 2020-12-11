@@ -2,7 +2,8 @@
 """
 from PyQt5.QtWidgets import QWidget, QFormLayout, QVBoxLayout
 from deriva.core import tag, ermrest_model as _erm
-from .common import SimpleTextPropertyWidget, SimpleComboBoxPropertyWidget, MultipleChoicePropertyWidget
+from .common import SimpleTextPropertyWidget, SimpleComboBoxPropertyWidget, MultipleChoicePropertyWidget, \
+    raise_on_invalid
 from .table import CommonTableWidget
 
 __system_cnames__ = {'RID', 'RCB', 'RCT', 'RMB', 'RMT'}
@@ -14,6 +15,7 @@ class AssetAnnotationEditor(QWidget):
 
     def __init__(self, column: _erm.Column, parent: QWidget = None):
         super(AssetAnnotationEditor, self).__init__(parent=parent)
+        raise_on_invalid(column, _erm.Column, tag.asset)
         self.column = column
         self.body = column.annotations[tag.asset]
         column_names = [c.name for c in self.column.table.columns if c.name not in __system_cnames__]

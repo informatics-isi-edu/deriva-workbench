@@ -1,4 +1,4 @@
-"""Editor for `source-definitions` annotation.
+"""Components for `source-definitions` annotation.
 """
 from copy import deepcopy
 import logging
@@ -8,7 +8,7 @@ from PyQt5.QtCore import QAbstractTableModel, QVariant, Qt, pyqtSlot, pyqtSignal
 from deriva.core import tag as _tag, ermrest_model as _erm
 from .pseudo_column import PseudoColumnEditWidget
 from .common import source_path_to_str, constraint_name, SomeOrAllSelectorWidget, SimpleComboBoxPropertyWidget, \
-    SimpleTextPropertyWidget, SimpleNestedPropertyManager
+    SimpleTextPropertyWidget, SimpleNestedPropertyManager, raise_on_invalid
 from .table import CommonTableWidget
 
 logger = logging.getLogger(__name__)
@@ -24,10 +24,14 @@ class SourceDefinitionsEditor(QWidget):
     table: _erm.Table
     body: dict
 
-    def __init__(self, table):
+    def __init__(self, table: _erm.Table, parent: QWidget = None):
         """Initialize the SourceDefinitionsEditor.
+
+        :param table: an ermrest table instance
+        :param parent: the parent widget
         """
-        super(SourceDefinitionsEditor, self).__init__()
+        raise_on_invalid(table, _erm.Table, _tag.source_definitions)
+        super(SourceDefinitionsEditor, self).__init__(parent=parent)
         self.table = table
         self.body = self.table.annotations[_tag.source_definitions]
         self.column_names = [c.name for c in self.table.columns]

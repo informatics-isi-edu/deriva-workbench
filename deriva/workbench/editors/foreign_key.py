@@ -4,7 +4,7 @@ import logging
 from PyQt5.QtWidgets import QWidget, QFormLayout, QVBoxLayout, QGroupBox, QHBoxLayout, QFrame
 from deriva.core import tag, ermrest_model as _erm
 from .common import SimpleTextPropertyWidget, MultipleChoicePropertyWidget, SimpleNestedPropertyManager, \
-    CommentDisplayWidget
+    CommentDisplayWidget, raise_on_invalid
 from .sortkeys import SortKeysWidget
 from .tabbed_contexts import EasyTabbedContextsWidget
 
@@ -20,6 +20,12 @@ class ForeignKeyAnnotationEditor(QWidget):
     __show_foreign_key_link__ = 'show_foreign_key_link'
 
     def __init__(self, fkey: _erm.ForeignKey, parent: QWidget = None):
+        """Initialize the widget.
+
+        :param fkey: a foreign key resource
+        :param parent: the parent widget
+        """
+        raise_on_invalid(fkey, _erm.ForeignKey, tag.foreign_key)
         super(ForeignKeyAnnotationEditor, self).__init__(parent=parent)
         self.body = fkey.annotations[tag.foreign_key]
 

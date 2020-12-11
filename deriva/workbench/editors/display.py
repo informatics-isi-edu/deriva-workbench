@@ -1,10 +1,11 @@
 """Editor for the `display` annotation.
 """
 import logging
+from typing import Union
 from PyQt5.QtWidgets import QWidget, QFormLayout, QVBoxLayout
 from deriva.core import tag, ermrest_model as _erm
 from .common import SimpleTextPropertyWidget, SimpleBooleanPropertyWidget, MultipleChoicePropertyWidget, \
-    SimpleComboBoxPropertyWidget
+    SimpleComboBoxPropertyWidget, raise_on_invalid
 from .tabbed_contexts import EasyTabbedContextsWidget
 
 logger = logging.getLogger(__name__)
@@ -24,13 +25,14 @@ class DisplayAnnotationEditor(QWidget):
     __show_foreign_key_link__ = 'show_foreign_key_link'
 
     def __init__(self,
-                 model_obj: _erm.Schema or _erm.Table or _erm.Column or _erm.Key or _erm.ForeignKey,
+                 model_obj: Union[_erm.Model, _erm.Schema, _erm.Table, _erm.Column, _erm.Key],
                  parent: QWidget = None):
         """ Initialize the widget.
 
         :param model_obj: a schema, table, column, key, or foreign key object that contains annotations
         :param parent: the parent widget of this widget
         """
+        raise_on_invalid(model_obj, [_erm.Model, _erm.Schema, _erm.Table, _erm.Column, _erm.Key], tag.display)
         super(DisplayAnnotationEditor, self).__init__(parent=parent)
         self.body = model_obj.annotations[tag.display]
 

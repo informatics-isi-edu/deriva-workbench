@@ -5,7 +5,7 @@ import logging
 from PyQt5.QtWidgets import QLabel, QVBoxLayout, QFrame, QWidget, QComboBox, QDialog, QButtonGroup, QRadioButton, QDialogButtonBox
 from PyQt5.QtCore import pyqtSlot
 from deriva.core import tag as _tag, ermrest_model as _erm
-from .common import constraint_name, source_path_to_str
+from .common import constraint_name, source_path_to_str, raise_on_invalid
 from .tabbed_contexts import TabbedContextsWidget
 from .pseudo_column import PseudoColumnEditWidget
 from .table import CommonTableWidget
@@ -27,6 +27,7 @@ class VisibleSourcesEditor(TabbedContextsWidget):
         :param tag: the specific annotation key (e.g., `...visible-columns`)
         :param parent: the parent widget
         """
+        raise_on_invalid(table, _erm.Table, tag)
         super(VisibleSourcesEditor, self).__init__(parent=parent)
         assert isinstance(table, _erm.Table)
         self.table, self.tag = table, tag
