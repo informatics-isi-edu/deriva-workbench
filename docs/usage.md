@@ -6,7 +6,7 @@ browsing and updating DERIVA catalog annotations.
 At this time, the DERIVA-Workbench is in an early phase of development and provided
 as a **development preview** only.
 
-### 1. Initial setup
+### 1. Initial Setup
 
 The first time you launch `deriva-workbench`, the application will ask you if you 
 want to add a server configuration.
@@ -30,7 +30,7 @@ catalog by default on restart of the workbench. After clicking "OK" on the Serve
 Configuration dialog, you must click "OK" again on the Configuration Options 
 dialog to actually connect to the server. 
 
-### 2. Connect and log in
+### 2. Connect and Log In
 
 At any time, you may return to the Options in order to add a new server + catalog 
 configuration or to change the currently selected server from the drop down.
@@ -48,7 +48,7 @@ web application (e.g., Chaise) and other DERIVA desktop applications. You may al
 use the workbench in combination with the DERIVA-Authentication agent to maintain a 
 persistent user credential to skip the login step in the DERIVA-Workbench.
 
-### 3. Browsing a schema
+### 3. Browsing a Schema
 
 When connected and authenticated to a server, the left panel of the application will 
 display a tree view of the catalog schema.
@@ -60,7 +60,7 @@ double-clicking on the label or on the chevron icon to the left of the label.
 
 ![Schema Browser (Expanded)](images/browse-expanded.png)
 
-### 4. Editing annotations (text-based)
+### 4. Editing Annotations (Text-based)
 
 Any annotation in the schema may be edited using an integrated JSON text editor. 
 Double-clicking on the "annotations" label will open the JSON text editor with the 
@@ -69,9 +69,11 @@ full annotations document for the selected model object.
 ![Annotation Editor (JSON)](images/annotation-editor-json.png)
 
 At present, malformed JSON will simply be ignored. The editor will only change the 
-underlying annotation if the text entered can be parsed without errors.
+underlying annotation if the text entered can be parsed without errors. While editing, 
+the annotations document you may add an annotation by adding the appropriate key and 
+body or remove an annotation by removing its key and body from the document.
 
-### 5. Editing annotations (graphically)
+### 5. Editing Annotations (Graphically)
 
 The workbench currently provides enhanced support for a few key annotations, including 
 `visible-columns`, `visible-foreign-keys`, `source-definitions`, `table-display`, 
@@ -168,7 +170,25 @@ modiviation of the sorting and link display behavior. The editor will update the
 
 ![Foreign Key Annotation Editor](images/foreign-key.png)
 
-### 6. Updating catalog annotations
+### 6. Adding or Removing Annotations (Graphically)
+
+You may also add or remove annotations in the _Schema Browser_ window using each annotation 
+item's context menu (typically, right-clicking on the item).
+
+To add an annotation, go to the context menu for the `annotations` item for any model 
+object (i.e., schema, table, column, key, foreign key). Select the "Add ..." menu item for the 
+desired annotation. Note that not all available annotations are applicable to all model objects.
+Please review the [DERIVA Annotation Guide](http://docs.derivacloud.org/users-guide/annotations/index.html).
+
+![Add Annotation](images/add-annotation.png)
+
+To remove an annotation, open the context menu for the specific annotation by its `tag:...` 
+item label in the schema browser. You will be asked to confirm before removing.
+
+![Remove Annotation](images/remove-annotation.png)
+
+
+### 7. Updating Server-side Annotations
 
 You may make any number of changes to annotations using the graphical editors or the JSON editor. 
 Changes will only be updated on the server by pressing the `Update` toolbar button found in the 
@@ -178,7 +198,7 @@ upper left hand side of the workbench.
 
 Confirmation or errors will be reported in the log display panel at the bottom of the window.
 
-### 7. Validating catalog annotations
+### 8. Validating Catalog Annotations
 
 You may validate annotations of any model object in the catalog. First, you must select a model 
 object that contains an `annotation` resource (don't select the annotations themselves but the 
@@ -193,13 +213,13 @@ for better viewing.
 
 ![Validate Detailed Output](images/validate-details.png)
 
-### 8. Refresh and discard changes
+### 9. Refresh From Server and Discard Local Changes
 
 At any time, you may refresh the local copy of the catalog model, and potentially discard any 
 changes that have not been updated on the remote server. To do so, use the "Refresh" button toward the left 
 in the toolbar.
 
-### 9. Dump and restore annotations
+### 10. Dump and Restore Annotations To/From Files
 
 You may dump and restore annotations to and from the local file system for any model object in 
 the catalog. First, you must select a model object that contains an `annotation` resource.
