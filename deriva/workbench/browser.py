@@ -52,8 +52,8 @@ class SchemaBrowser(QGroupBox):
     """Schema browser widget.
     """
 
-    clicked = pyqtSignal()
-    doubleClicked = pyqtSignal()
+    itemSelected = pyqtSignal()
+    itemOpened = pyqtSignal()
 
     def __init__(self, parent: QWidget = None):
         """Initialize the widget.
@@ -61,8 +61,8 @@ class SchemaBrowser(QGroupBox):
         :param parent: the parent widget
         """
         super(SchemaBrowser, self).__init__('Schema Browser', parent=parent)
+        self.lastItemSelected = self.lastItemOpenned = None
         self._ermrest_model: Union[_erm.Model, None] = None
-        self.current_selection = self._last_openned = None
         self._treeView = self._create_treeView()
 
         # layout
@@ -84,6 +84,18 @@ class SchemaBrowser(QGroupBox):
             treeView.setModel(model)
 
         return treeView
+
+    def _selectAndOpen(self, index: QModelIndex):
+        """Select and open an item.
+
+        :param index: the tree model index to select and open
+        """
+        selection = self._treeView.selectionModel()
+        selection.clear()
+        selection.select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        self.lastItemSelected = self.lastItemOpenned = index.data(Qt.UserRole)
+        self.itemOpened.emit()
+        self.itemSelected.emit()
 
     @pyqtSlot(QPoint)
     def _on_customContextMenu(self, pos: QPoint):
@@ -110,24 +122,14 @@ class SchemaBrowser(QGroupBox):
                 if action == deleteAction:
                     reply = QMessageBox.question(
                         self,
-                        'Confirmation Required',
-                        'Are you sure you want to delete "%s"?' % tag
+                        self.tr('Confirmation Required'),
+                        self.tr('Are you sure you want to delete "') + tag + '"?'
                     )
                     if reply == QMessageBox.Yes:
                         # delete the specified annotation
                         del model_obj.annotations[tag]
                         index.model().removeRow(index.row(), index.parent())
-                        # if current_select is this tag or the parent 'annotations', force refresh of the editor
-                        if (
-                                self._last_openned == {__parent__: model_obj} or
-                                self._last_openned == {__parent__: model_obj, __tag__: tag}
-                        ):
-                            selection = self._treeView.selectionModel()
-                            selection.clear()
-                            selection.select(index.parent(), QItemSelectionModel.Select | QItemSelectionModel.Rows)
-                            self.current_selection = self._last_openned = {__parent__: model_obj}
-                            self.clicked.emit()
-                            self.doubleClicked.emit()
+                        self._selectAndOpen(index.parent())
 
             else:
                 # case: all annotations selected
@@ -136,28 +138,27 @@ class SchemaBrowser(QGroupBox):
                     addAction.setData(tag)
                 action = menu.exec_(self.mapToGlobal(pos))
                 if action and action.data():
+                    # add the new tag to the annotations
                     tag = action.data()
                     model_obj.annotations[tag] = {}
                     item.appendRow(
                         _SchemaBrowserItem(tag, {__parent__: model_obj, __tag__: tag}, 12, color=_annotationColor)
                     )
-                    # if current_select is the parent 'annotations', for refresh of the editor
-                    if self.current_selection == {__parent__: model_obj}:
-                        self.doubleClicked.emit()
+                    self._selectAndOpen(index)
 
     @pyqtSlot(QModelIndex)
     def _on_double_clicked(self, index: QModelIndex):
-        """Double-click handler.
+        """Double-click handler, updates last item opened and emits signal
         """
-        self.current_selection = self._last_openned = index.data(Qt.UserRole)
-        self.doubleClicked.emit()
+        self.lastItemOpenned = index.data(Qt.UserRole)
+        self.itemOpened.emit()
 
     @pyqtSlot(QModelIndex)
     def _on_clicked(self, index: QModelIndex):
-        """Click handler.
+        """Click handler, updates the last item selected and emits signal.
         """
-        self.current_selection = index.data(Qt.UserRole)
-        self.clicked.emit()
+        self.lastItemSelected = index.data(Qt.UserRole)
+        self.itemSelected.emit()
 
     def setModel(self, model: _erm.Model) -> None:
         """Sets the ermrest model for the browser.
@@ -167,7 +168,7 @@ class SchemaBrowser(QGroupBox):
         :param model: an ermrest Model instance
         """
         self._ermrest_model = model
-        self.current_selection = self._last_openned = None
+        self.lastItemSelected = self.lastItemOpenned = None
 
         treeModel = QStandardItemModel()
         rootNode = treeModel.invisibleRootItem()

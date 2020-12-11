@@ -40,8 +40,8 @@ class WorkbenchWindow(QMainWindow):
 
         # ui properties
         self.ui = _WorkbenchWindowUI(self)
-        self.ui.browser.clicked.connect(self._on_browser_clicked)
-        self.ui.browser.doubleClicked.connect(self._on_browser_double_clicked)
+        self.ui.browser.itemSelected.connect(self._on_browser_itemSelected)
+        self.ui.browser.itemOpened.connect(self._on_browser_itemOpened)
         self.setWindowTitle(self.ui.title)
         self.progress_update_signal.connect(self.updateProgress)
 
@@ -59,12 +59,12 @@ class WorkbenchWindow(QMainWindow):
         self.configure(hostname, catalog_id)
 
     @pyqtSlot()
-    def _on_browser_double_clicked(self):
-        self.ui.editor.data = self.ui.browser.current_selection
+    def _on_browser_itemOpened(self):
+        self.ui.editor.data = self.ui.browser.lastItemOpenned
 
     @pyqtSlot()
-    def _on_browser_clicked(self):
-        if self.ui.browser.current_selection and hasattr(self.ui.browser.current_selection, 'annotations'):
+    def _on_browser_itemSelected(self):
+        if self.ui.browser.lastItemSelected and hasattr(self.ui.browser.lastItemSelected, 'annotations'):
             self.ui.actionValidate.setEnabled(True)
             self.ui.actionDumpAnnotations.setEnabled(True)
             self.ui.actionRestoreAnnotations.setEnabled(True)
@@ -184,7 +184,7 @@ class WorkbenchWindow(QMainWindow):
     def enableControls(self):
         self.ui.actionUpdate.setEnabled(self.connection.get("catalog") is not None and self.identity is not None)  # and self.auth_window.authenticated())
         self.ui.actionRefresh.setEnabled(self.connection.get("catalog") is not None)
-        has_annotations = hasattr(self.ui.browser.current_selection, 'annotations')
+        has_annotations = hasattr(self.ui.browser.lastItemSelected, 'annotations')
         self.ui.actionValidate.setEnabled(has_annotations)
         self.ui.actionDumpAnnotations.setEnabled(has_annotations)
         self.ui.actionRestoreAnnotations.setEnabled(has_annotations)
@@ -316,12 +316,12 @@ class WorkbenchWindow(QMainWindow):
             return
 
         # check if current selection has 'annotations' container
-        current_selection = self.ui.browser.current_selection
-        if not hasattr(current_selection, 'annotations'):
+        model_obj = self.ui.browser.lastItemSelected
+        if not hasattr(model_obj, 'annotations'):
             self.updateStatus("Cannot validate annotations. Current selected object does not have 'annotations'.")
 
         # do validation
-        self.validatAnnotations(current_selection)
+        self.validatAnnotations(model_obj)
 
     def validatAnnotations(self, current_selection):
         """Fires off annotation validation task.
@@ -390,7 +390,7 @@ class WorkbenchWindow(QMainWindow):
             error = self.tr("No directory to dump and restore annotations. Go to options and edit this server configuration.")
 
         # get current selected model obj
-        model_object = self.ui.browser.current_selection
+        model_object = self.ui.browser.lastItemSelected
         if not hasattr(model_object, 'annotations'):
             error = self.tr("Cannot dump annotations. Current selected object does not have 'annotations' property.")
 
@@ -452,7 +452,7 @@ class WorkbenchWindow(QMainWindow):
             error = self.tr("No directory to dump and restore annotations. Go to options and edit this server configuration.")
 
         # get current selected model obj
-        model_object = self.ui.browser.current_selection
+        model_object = self.ui.browser.lastItemSelected
         if not hasattr(model_object, 'annotations'):
             error = self.tr("Cannot restore annotations. Current selected object does not have 'annotations' property.")
 
