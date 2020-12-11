@@ -34,6 +34,12 @@ class SchemaEditor(QGroupBox):
             widget = None
         elif hasattr(value, 'prejson'):
             widget = JSONEditor(value.prejson())
+        elif not isinstance(value, dict):
+            widget = None
+        elif 'acls' in value:
+            widget = JSONEditor(value.get('acls'))
+        elif 'acl_bindings' in value:
+            widget = JSONEditor(value.get('acl_bindings'))
         elif value.get('tag') == tag.visible_columns or value.get('tag') == tag.visible_foreign_keys:
             assert value and isinstance(value, dict) and 'parent' in value
             widget = VisibleSourcesEditor(value['parent'], value['tag'])

@@ -7,14 +7,19 @@ from PyQt5.Qt import QStandardItemModel, QStandardItem
 from PyQt5.QtGui import QFont, QColor
 from deriva.core import ermrest_model as _erm, tag as tags
 
-# colors for menu items by type
-_annotationColor = QColor(102, 153, 0)
-_columnColor = QColor(51, 102, 204)
-_keyColor = QColor(204, 102, 0)
-_fkeyColor = QColor(153, 51, 102)
+# colors for menu items by type (ordered alphabetically as they will be displayed)
+#   palette: 581845, 900C3F, C70039, FF5733, FFC300
+_aclBindingsColor = QColor('#581845')
+_aclsColor = QColor('#900C3F')
+_annotationColor = QColor(102, 153, 0)  # green
+_columnColor = QColor(51, 102, 204)  # blue
+_fkeyColor = QColor('#C70039')  # previous: 153, 51, 102
+_keyColor = QColor('#FF5733')  # previous: 204, 102, 0
 
 # keys
 __annotations__ = 'annotations'
+__acls__ = 'acls'
+__acl_bindings__ = 'acl_bindings'
 __parent__ = 'parent'
 __tag__ = 'tag'
 
@@ -168,9 +173,6 @@ class SchemaBrowser(QGroupBox):
         """
         self.lastItemSelected = self.lastItemOpened = None
 
-        treeModel = QStandardItemModel()
-        rootNode = treeModel.invisibleRootItem()
-
         def add_annotations(parent: _SchemaBrowserItem, obj: Any):
             """Adds the 'annotations' container and items.
 
@@ -186,11 +188,39 @@ class SchemaBrowser(QGroupBox):
             # ...append container to parent object
             parent.appendRow(annotationsItem)
 
+        def add_acls(parent: _SchemaBrowserItem, obj: Any):
+            """Adds the 'acls' and 'acl_bindings' containers.
+
+            :param parent: a standard model item
+            :param obj: an ermrest model object
+            """
+            if hasattr(obj, __acls__):
+                # ...add the acls container item
+                aclsItem = _SchemaBrowserItem(__acls__, {__acls__: obj.acls}, 12, color=_aclsColor)
+                parent.appendRow(aclsItem)
+
+            if hasattr(obj, __acl_bindings__):
+                # ...add the acl_bindings container item
+                aclBindingsItem = _SchemaBrowserItem(__acl_bindings__, {__acl_bindings__: obj.acl_bindings}, 12, color=_aclBindingsColor)
+                parent.appendRow(aclBindingsItem)
+
+        # create tree
+        treeModel = QStandardItemModel()
+
+        # add root
+        rootNode = _SchemaBrowserItem('catalog (%s)' % model.catalog.get_server_uri(), model, 12, set_bold=True)
+        schemasNode = _SchemaBrowserItem('schemas', None, 12)
+        rootNode.appendRow(schemasNode)
+        add_annotations(rootNode, model)
+        add_acls(rootNode, model)
+        treeModel.appendRow(rootNode)
+
         if model:
             # add schemas
             for schema in model.schemas.values():
                 schemaItem = _SchemaBrowserItem(schema.name, schema, 12, set_bold=True)
                 add_annotations(schemaItem, schema)
+                add_acls(schemaItem, schema)
 
                 # add tables
                 tablesItem = _SchemaBrowserItem('tables', None, 12)
@@ -198,6 +228,7 @@ class SchemaBrowser(QGroupBox):
                 for table in schema.tables.values():
                     tableItem = _SchemaBrowserItem(table.name, table, 12)
                     add_annotations(tableItem, table)
+                    add_acls(tableItem, table)
 
                     # add columns
                     colsItem = _SchemaBrowserItem('columns', None, 12, color=_columnColor)
@@ -205,6 +236,7 @@ class SchemaBrowser(QGroupBox):
                     for col in table.columns:
                         colItem = _SchemaBrowserItem(col.name, col, 12, color=_columnColor)
                         add_annotations(colItem, col)
+                        add_acls(colItem, col)
                         colsItem.appendRow(colItem)
 
                     # add keys
@@ -221,14 +253,16 @@ class SchemaBrowser(QGroupBox):
                     for fkey in table.foreign_keys:
                         fkeyItem = _SchemaBrowserItem(fkey.constraint_name, fkey, 12, color=_fkeyColor)
                         add_annotations(fkeyItem, fkey)
+                        add_acls(fkeyItem, fkey)
                         fkeysItem.appendRow(fkeyItem)
 
                     tablesItem.appendRow(tableItem)
-                rootNode.appendRow(schemaItem)
+                schemasNode.appendRow(schemaItem)
 
             rootNode.sortChildren(0)
 
         # create new and replace old treeview
         treeView = self._create_treeView(treeModel)
+        treeView.expand(rootNode.index())  # expand root
         self.layout().replaceWidget(self._treeView, treeView)
         self._treeView = treeView
