@@ -1,21 +1,17 @@
 """Widgets for editing the 'column-display' annotation.
 """
-from PyQt5.QtWidgets import QVBoxLayout, QWidget, QGroupBox
-from PyQt5.QtCore import pyqtSlot
+from PyQt5.QtWidgets import QVBoxLayout, QWidget
 from deriva.core import tag, ermrest_model as _erm
 from .common import raise_on_invalid, MultipleChoicePropertyWidget, SimpleNestedPropertyManager, \
     SimpleTextPropertyWidget
 from .markdown_patterns import MarkdownPatternForm
 from .sortkeys import SortKeysWidget
-from .tabbed_contexts import TabbedContextsWidget
+from .tabbed_contexts import EasyTabbedContextsWidget
 
 
-class ColumnDisplayEditor(TabbedContextsWidget):
+class ColumnDisplayEditor(EasyTabbedContextsWidget):
     """Editor for the column-display contexts.
     """
-
-    column: _erm.Column
-    body: dict
 
     def __init__(self, column: _erm.Column, parent: QWidget = None):
         """Initialize the widget.
@@ -24,39 +20,13 @@ class ColumnDisplayEditor(TabbedContextsWidget):
         :param parent: the parent widget
         """
         raise_on_invalid(column, _erm.Column, tag.column_display)
-        super(ColumnDisplayEditor, self).__init__(parent=parent)
-        self.column = column
-        self.body = self.column.annotations[tag.column_display]
-        self.createContextRequested.connect(self._on_creatContext)
-        self.removeContextRequested.connect(self._on_removeContext)
-
-        # create tabs for each context
-        for context in self.body:
-            contents = self.body[context]
-            tab = _ColumnDisplayContextEditor(self.column, contents, parent=self)
-            self.addContext(tab, context)
-
-        # set first context active
-        if self.body:
-            self.setActiveContext(list(self.body.keys())[0])
-
-    @pyqtSlot(str)
-    def _on_creatContext(self, context):
-        """Handles the 'createContextRequested' signal.
-        """
-        # create new context entry
-        self.body[context] = contents = {}
-
-        # create and add new context editor
-        contextEditor = _ColumnDisplayContextEditor(self.column, contents, parent=self)
-        self.addContext(contextEditor, context)
-
-    @pyqtSlot(str)
-    def _on_removeContext(self, context):
-        """Handles the 'removeContextRequested' signal.
-        """
-        del self.body[context]
-        self.removeContext(context)
+        super(ColumnDisplayEditor, self).__init__(
+            tag.column_display,
+            column.annotations,
+            create_context_value=lambda context: {},
+            create_context_widget_fn=lambda context, parent=None: _ColumnDisplayContextEditor(column, column.annotations[tag.column_display][context], parent=parent),
+            purge_on_empty=False,
+            parent=parent)
 
 
 class _ColumnDisplayContextEditor(MarkdownPatternForm):
