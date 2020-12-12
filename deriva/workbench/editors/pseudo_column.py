@@ -5,12 +5,13 @@ import sys
 from PyQt5.QtCore import pyqtSlot, pyqtSignal
 from PyQt5.QtGui import QIntValidator
 from PyQt5.QtWidgets import QWidget, QFormLayout, QComboBox, QVBoxLayout, QListWidget, QHBoxLayout, QPushButton, \
-    QTabWidget, QFrame
+    QTabWidget, QFrame, QLabel
 from deriva.core import ermrest_model as _erm, tag as _tag
 from .common import source_component_to_str, constraint_name, SimpleTextPropertyWidget, SimpleComboBoxPropertyWidget, \
     MultipleChoicePropertyWidget, SimpleBooleanPropertyWidget, CommentDisplayWidget, SimpleNestedPropertyManager
 from .markdown_patterns import MarkdownPatternForm
 from .sortkeys import SortKeysWidget
+from .table import CommonTableWidget
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ class PseudoColumnEditWidget(QTabWidget):
             raise ValueError('Invalid mode selected for source key control initialization')
 
         # ...source
-        self.sourceEntry = SourceEntryWidget(self.table, self.entry, self)
+        self.sourceEntry = _SourceEntryWidget(self.table, self.entry, self)
         self.sourceEntry.setEnabled(enable_source_entry)
         form.addRow('Source Entry', self.sourceEntry)
 
@@ -216,6 +217,121 @@ class PseudoColumnEditWidget(QTabWidget):
         )
         form.addRow('Array UX Mode', arrayUXMode)
 
+        #
+        # -- Facet --
+        #
+        facetTab = QWidget(parent=self)
+        form = QFormLayout(facetTab)
+        facetTab.setLayout(form)
+        self.addTab(facetTab, 'Facet')
+
+        # ...instructive note
+        form.addWidget(QLabel("The options on this form apply only when the pseudo-column is used as a facet.", parent=facetTab))
+
+        # ...open
+        form.addRow("Open", SimpleBooleanPropertyWidget(
+            'Open the facet by default',
+            'open',
+            self.entry,
+            truth_fn=lambda x: x is not None,
+            parent=facetTab
+        ))
+
+        # ...ux_mode
+        form.addRow('UX Mode', SimpleComboBoxPropertyWidget(
+            'ux_mode',
+            self.entry,
+            choices=['choices', 'ranges', 'check_presence'],
+            placeholder='Select the default UX mode for multi-modal facets',
+            parent=facetTab
+        ))
+
+        # ...constraints
+        constraintsTab = QTabWidget(parent=self)
+        form.addRow('Constraints', constraintsTab)
+
+        # ...choices
+        constraintsTab.addTab(
+            CommonTableWidget(
+                'choices',
+                self.entry,
+                editor_widget=SimpleTextPropertyWidget(
+                    '_',  # this is just a bogus property name
+                    {'_': ''},  # bogus property, widget will still produce valid `.value`
+                    placeholder='Enter a choice',
+                    truth_fn=lambda x: x is not None,
+                    parent=facetTab
+                ),
+                parent=constraintsTab
+            ),
+            'Choices'
+        )
+
+        # ...ranges
+        constraintsTab.addTab(
+            CommonTableWidget(
+                'ranges',
+                self.entry,
+                editor_widget=_RangeWidget(facetTab),
+                headers_fn=lambda ranges: ['Min', 'Min Exclusive', 'Max', 'Max Exclusive'],
+                row_fn=lambda range: (
+                    range.get('min'), range.get('min_exclusive'), range.get('max'), range.get('max_exclusive')
+                ),
+                parent=constraintsTab
+            ),
+            'Ranges'
+        )
+
+        # ...not_null
+        constraintsTab.addTab(
+            SimpleBooleanPropertyWidget(
+                'Match any record that has a value other than NULL',
+                'not_null',
+                self.entry,
+                parent=constraintsTab
+            ),
+            'Not NULL'
+        )
+
+        # ...bar_plot
+        form.addRow(
+            'Bar Plot',
+            MultipleChoicePropertyWidget(
+                'bar_plot',
+                self.entry,
+                {
+                    'Default behavior': None,
+                    'Show': True,
+                    'Hide': False
+                },
+                other_key='Show w/ # Bins',
+                other_widget=_NBinsWidget(self.entry, parent=self),
+                parent=self
+            )
+        )
+
+        # ...hide_null_choice
+        form.addRow(
+            'Hide NULL',
+            SimpleBooleanPropertyWidget(
+                'Hide the NULL option in the choice picker',
+                'hide_null_choice',
+                self.entry,
+                parent=self
+            )
+        )
+
+        # ...hide_not_null_choice
+        form.addRow(
+            'Hide NOT NULL',
+            SimpleBooleanPropertyWidget(
+                'Hide the NOT NULL option in the choice picker',
+                'hide_not_null_choice',
+                self.entry,
+                parent=self
+            )
+        )
+
     @pyqtSlot()
     def on_sourcekey_valueChanged(self):
         """Handles changes to the `sourcekey` combobox.
@@ -223,7 +339,7 @@ class PseudoColumnEditWidget(QTabWidget):
         self.sourceEntry.setEnabled(__sourcekey__ not in self.entry)
 
 
-class SourceEntryWidget(QWidget):
+class _SourceEntryWidget(QWidget):
     """Pseudo-column 'source' property editor widget.
     """
 
@@ -239,7 +355,7 @@ class SourceEntryWidget(QWidget):
         :param entry: the visible-source pseudo-column entry dictionary; must contain an 'source' property
         :param parent: the parent widget
         """
-        super(SourceEntryWidget, self).__init__(parent=parent)
+        super(_SourceEntryWidget, self).__init__(parent=parent)
         self.table = table
         self.entry = entry
         self.context = [table]
@@ -401,3 +517,108 @@ class SourceEntryWidget(QWidget):
 
         # emit changes
         self.valueChanged.emit()
+
+
+class _RangeWidget(QWidget):
+    """Inline editor widget for pseudu-column 'range' property values.
+    """
+
+    def __init__(self, parent: QWidget = None):
+        """Initializes the widget.
+
+        :param parent: parent of this widget
+        """
+        super(_RangeWidget, self).__init__(parent=parent)
+        self._value = {}
+
+        # layout
+        form = QFormLayout(self)
+        form.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(form)
+
+        # add min and max widgets
+        for label, key, exclusive in [
+            ('Min', 'min', 'min_exclusive'),
+            ('Max', 'max', 'max_exclusive')
+        ]:
+            # row layout
+            widget = QWidget(self)
+            layout = QHBoxLayout(self)
+            layout.setContentsMargins(0, 0, 0, 0)
+            widget.setLayout(layout)
+            form.addRow(label, widget)
+
+            # key (numeric)
+            layout.addWidget(
+                SimpleTextPropertyWidget(
+                    key,
+                    self._value,
+                    placeholder='Enter a number',
+                    validator=QIntValidator(),
+                    truth_fn=lambda x: x is not None,
+                    parent=widget
+                )
+            )
+
+            # exclusive (boolean)
+            layout.addWidget(
+                SimpleBooleanPropertyWidget(
+                    'exclusive',
+                    exclusive,
+                    self._value,
+                    parent=widget
+                )
+            )
+
+    @property
+    def value(self):
+        return self._value
+
+
+class _NBinsWidget(QWidget):
+    """Special purpose n_bins widget.
+    """
+
+    valueChanged = pyqtSignal()
+
+    __n_bins__ = 'n_bins'
+
+    def __init__(self, body: dict, parent: QWidget = None):
+        """Initialize the widget.
+
+        :param body: annotation property for 'bar_plot'
+        :param parent: the parent widget
+        """
+        super(_NBinsWidget, self).__init__(parent=parent)
+        self.value = body.get('bar_plot')
+        if not isinstance(self.value, dict) or self.__n_bins__ not in self.value:
+            self.value = {self.__n_bins__: 0}
+
+        # layout
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+
+        # setup the simple text widget
+        self._textWidget = SimpleTextPropertyWidget(
+            self.__n_bins__,
+            {self.__n_bins__: str(self.value[self.__n_bins__])},  # pass value as string
+            placeholder='Enter number of bins',
+            validator=QIntValidator(),
+            truth_fn=lambda x: x is not None,
+            parent=self
+        )
+        self._textWidget.valueChanged.connect(self._on_text_valueChanged)
+        layout.addWidget(self._textWidget)
+
+    @pyqtSlot()
+    def _on_text_valueChanged(self):
+        """Handle text widget value changes.
+        """
+        try:
+            # convert to int
+            n_bins = int(self._textWidget.value)
+            self.value = {self.__n_bins__: n_bins}
+            self.valueChanged.emit()
+        except ValueError:
+            pass
