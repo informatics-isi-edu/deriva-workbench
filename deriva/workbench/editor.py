@@ -61,6 +61,8 @@ class SchemaEditor(QGroupBox):
                 widget = KeyDisplayEditor(value['parent'])
             elif value.get('tag') == tag.column_display:
                 widget = ColumnDisplayEditor(value['parent'])
+            else:
+                widget = AnnotationEditor(value)
         else:
             widget = AnnotationEditor(value)
 
