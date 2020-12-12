@@ -8,3 +8,4 @@ from .table_display import TableDisplayContextsEditor
 from .foreign_key import ForeignKeyAnnotationEditor
 from .display import DisplayAnnotationEditor
 from .asset import AssetAnnotationEditor
+from .key_display import KeyDisplayEditor
