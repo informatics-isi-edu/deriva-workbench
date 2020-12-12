@@ -383,7 +383,7 @@ class MultipleChoicePropertyWidget(QWidget):
         self.value = self.body.get(key)
 
         # apply layout
-        if not layout:
+        if layout is None:
             layout = QHBoxLayout()
             layout.setContentsMargins(0, 0, 0, 0)
         layout.setParent(self)
