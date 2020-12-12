@@ -383,7 +383,9 @@ class MultipleChoicePropertyWidget(QWidget):
         self.value = self.body.get(key)
 
         # apply layout
-        layout = layout if layout is not None else QHBoxLayout()
+        if not layout:
+            layout = QHBoxLayout()
+            layout.setContentsMargins(0, 0, 0, 0)
         layout.setParent(self)
         self.setLayout(layout)
 
@@ -402,6 +404,8 @@ class MultipleChoicePropertyWidget(QWidget):
         # other
         if other_widget:
             assert hasattr(other_widget, 'value'), "'other_widget' must have 'value' attribute"
+            if hasattr(other_widget, 'valueChanged'):
+                self.other_widget.valueChanged.connect(self._on_other_widget_valueChanged)
             rbutton = QRadioButton(other_key, parent=self)
             self.buttonGroup.addButton(rbutton)
             layout.addWidget(rbutton)
@@ -410,6 +414,21 @@ class MultipleChoicePropertyWidget(QWidget):
                 rbutton.setChecked(True)
             else:
                 other_widget.setEnabled(False)
+
+    @pyqtSlot()
+    def _on_other_widget_valueChanged(self):
+        """Handle changes from other_widget.
+        """
+        self.value = self.other_widget.value
+        # ...set value in annotation
+        set_value_or_del_key(
+            self.body,
+            self._truth_fn(self.value),
+            self.key,
+            self.value
+        )
+        # ...emit signal
+        self.valueChanged.emit()
 
     @pyqtSlot()
     def _on_buttonGroup_clicked(self):
