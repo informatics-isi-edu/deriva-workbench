@@ -6,19 +6,78 @@ from PyQt5.QtWidgets import QLabel, QVBoxLayout, QFrame, QWidget, QComboBox, QDi
 from PyQt5.QtCore import pyqtSlot
 from deriva.core import tag as _tag, ermrest_model as _erm
 from .common import constraint_name, source_path_to_str, raise_on_invalid
-from .tabbed_contexts import TabbedContextsWidget
+from .tabbed_contexts import EasyTabbedContextsWidget
 from .pseudo_column import PseudoColumnEditWidget
 from .table import CommonTableWidget
+
 
 logger = logging.getLogger(__name__)
 
 
-class VisibleSourcesEditor(TabbedContextsWidget):
+def _create_context_value(tag: str, context: str):
+    """Create initial value for the given visible sources tag and context.
+
+    :param tag: the specific annotation key (e.g., `...visible-columns`)
+    :param context: the context name
+    """
+    # create new context entry
+    if tag == _tag.visible_columns and context == 'filter':
+        return {'and': []}
+    else:
+        return []
+
+
+def _create_visible_source_context_editor(table: _erm.Table, tag: str, body: dict, context: str, parent: QWidget = None):
+    """Create visible sources context editor for the given context.
+
+    :param table: the ermrest table that contains the annotation
+    :param tag: the specific annotation key (e.g., `...visible-columns`)
+    :param body: the context body
+    :param context: the context name
+    :param parent: the parent widget for the context editor
+    """
+    # adjust the key, body to be used based on context
+    if tag == _tag.visible_columns and context == 'filter':
+        key = 'and'
+        body = body[context]
+    else:
+        key = context
+        body = body
+
+    # determine visible-source dialog editor mode
+    if tag == _tag.visible_columns:
+        mode = VisibleSourceDialog.VisibleColumns
+        if context == 'entry':
+            mode &= ~VisibleSourceDialog.AllowPseudoColumn
+        elif context == 'filter':
+            mode = VisibleSourceDialog.AllowPseudoColumn
+    else:
+        mode = VisibleSourceDialog.VisibleForeignKeys
+
+    # dialog exec function
+    def visible_source_dialog_exec_fn(value, parent: QWidget = None):
+        dialog = VisibleSourceDialog(table, entry=value, mode=mode, parent=parent)
+        code = dialog.exec_()
+        value = deepcopy(dialog.entry)
+        dialog.hide()
+        del dialog
+        return code, value
+
+    # create and add new context editor
+    return CommonTableWidget(
+        key,
+        body,
+        editor_dialog_exec_fn=visible_source_dialog_exec_fn,
+        headers_fn=lambda sources: ["Type", "Source"],
+        row_fn=_source_entry_to_row,
+        truth_fn=lambda x: x is not None,
+        parent=parent
+    )
+
+
+class VisibleSourcesEditor(EasyTabbedContextsWidget):
     """Visible sources (column or foreign key) annotation editor.
     """
-
-    table: _erm.Table
-    tag: str
 
     def __init__(self, table: _erm.Table, tag: str, parent: QWidget = None):
         """Initialize visible sources editor.
@@ -28,82 +87,14 @@ class VisibleSourcesEditor(TabbedContextsWidget):
         :param parent: the parent widget
         """
         raise_on_invalid(table, _erm.Table, tag)
-        super(VisibleSourcesEditor, self).__init__(parent=parent)
-        assert isinstance(table, _erm.Table)
-        self.table, self.tag = table, tag
-        self.body: dict = self.table.annotations[tag]
-        self.createContextRequested.connect(self._on_creatContext)
-        self.removeContextRequested.connect(self._on_removeContext)
-
-        # create tabs for each context
-        for context in self.body:
-            self._addVisibleSourcesContext(context)
-
-        # set first context active
-        if self.body:
-            self.setActiveContext(list(self.body.keys())[0])
-
-    def _addVisibleSourcesContext(self, context: str):
-        """Add the visible sources context editor for the given context.
-        """
-        # adjust the key, body to be used based on context
-        if self.tag == _tag.visible_columns and context == 'filter':
-            key = 'and'
-            body = self.body[context]
-        else:
-            key = context
-            body = self.body
-
-        # determine visible-source dialog editor mode
-        if self.tag == _tag.visible_columns:
-            mode = VisibleSourceDialog.VisibleColumns
-            if context == 'entry':
-                mode &= ~VisibleSourceDialog.AllowPseudoColumn
-            elif context == 'filter':
-                mode = VisibleSourceDialog.AllowPseudoColumn
-        else:
-            mode = VisibleSourceDialog.VisibleForeignKeys
-
-        # dialog exec function
-        def visible_source_dialog_exec_fn(value, parent: QWidget = None):
-            dialog = VisibleSourceDialog(self.table, entry=value, mode=mode, parent=parent)
-            code = dialog.exec_()
-            value = deepcopy(dialog.entry)
-            dialog.hide()
-            del dialog
-            return code, value
-
-        # create and add new context editor
-        contextEditor = CommonTableWidget(
-            key,
-            body,
-            editor_dialog_exec_fn=visible_source_dialog_exec_fn,
-            headers_fn=lambda sources: ["Type", "Source"],
-            row_fn=_source_entry_to_row,
-            truth_fn=lambda x: x is not None,
-            parent=self
+        super(VisibleSourcesEditor, self).__init__(
+            tag,
+            table.annotations,
+            create_context_value=lambda context: _create_context_value(tag, context),
+            create_context_widget_fn=lambda context, parent=None: _create_visible_source_context_editor(table, tag, table.annotations[tag], context, parent=parent),
+            purge_on_empty=False,
+            parent=parent
         )
-        self.addContext(contextEditor, context)
-
-    @pyqtSlot(str)
-    def _on_creatContext(self, context):
-        """Handles the 'createContextRequested' signal.
-        """
-        # create new context entry
-        if self.tag == _tag.visible_columns and context == 'filter':
-            self.body[context] = {'and': []}
-        else:
-            self.body[context] = []
-
-        # add context
-        self._addVisibleSourcesContext(context)
-
-    @pyqtSlot(str)
-    def _on_removeContext(self, context):
-        """Handles the 'removeContextRequested' signal.
-        """
-        del self.body[context]
-        self.removeContext(context)
 
 
 def _source_entry_to_row(entry):

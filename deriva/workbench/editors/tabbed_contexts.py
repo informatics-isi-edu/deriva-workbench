@@ -147,6 +147,7 @@ class EasyTabbedContextsWidget(TabbedContextsWidget):
                  body: dict,
                  create_context_value: Callable,
                  create_context_widget_fn: Callable,
+                 purge_on_empty: bool = True,
                  parent: QWidget = None):
         """Initialize the widget.
 
@@ -156,12 +157,14 @@ class EasyTabbedContextsWidget(TabbedContextsWidget):
                 name string, and it may return Any type of value.
         :param create_context_widget_fn: function to create an editor widget to manage a context; it must accept a
                 context name string and an optional parent object, and it may return an instance of QWidget.
+        :param purge_on_empty: if all contexts are removed, purge the 'key' from the 'body'
         :param parent: this widget's parent
         """
         super(EasyTabbedContextsWidget, self).__init__(parent=parent)
         self.key, self.body = key, body
         self.create_context_value = create_context_value
         self.create_context_widget_fn = create_context_widget_fn
+        self.purge_on_empty = purge_on_empty
 
         # connect the create/remove slots
         self.createContextRequested.connect(self._on_createContextRequested)
@@ -199,7 +202,7 @@ class EasyTabbedContextsWidget(TabbedContextsWidget):
         """Handles the 'removeContextRequested' signal.
         """
         del self.body[self.key][context]
-        if not self.body[self.key]:
+        if self.purge_on_empty and not self.body[self.key]:
             del self.body[self.key]
         self.removeContext(context)
         # emit
