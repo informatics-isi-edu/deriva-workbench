@@ -9,7 +9,7 @@ from .sortkeys import SortKeysWidget
 from .tabbed_contexts import EasyTabbedContextsWidget
 
 
-class TableDisplayContextsEditor(EasyTabbedContextsWidget):
+class TableDisplayEditor(EasyTabbedContextsWidget):
     """Editor for the table-display contexts.
     """
 
@@ -20,11 +20,11 @@ class TableDisplayContextsEditor(EasyTabbedContextsWidget):
         :param parent: the parent widget
         """
         raise_on_invalid(table, _erm.Table, tag.table_display)
-        super(TableDisplayContextsEditor, self).__init__(
+        super(TableDisplayEditor, self).__init__(
             tag.table_display,
             table.annotations,
             create_context_value=lambda context: {},
-            create_context_widget_fn=lambda context, parent = None: TableDisplayEditor(table, context, table.annotations[tag.table_display][context], parent=parent),
+            create_context_widget_fn=lambda context, parent = None: _TableDisplayContextEditor(table, context, table.annotations[tag.table_display][context], parent=parent),
             purge_on_empty=False,
             parent=parent
         )
@@ -39,7 +39,7 @@ __markdown_pattern_field_keys__ = [
 ]
 
 
-class TableDisplayEditor(QWidget):
+class _TableDisplayContextEditor(QWidget):
     """Editor for a table-display annotation (single entry).
     """
 
@@ -48,7 +48,7 @@ class TableDisplayEditor(QWidget):
     body: dict
 
     def __init__(self, table: _erm.Table, context_name: str, body: dict, parent: QWidget = None):
-        super(TableDisplayEditor, self).__init__(parent=parent)
+        super(_TableDisplayContextEditor, self).__init__(parent=parent)
         self.table, self.context_name, self.body = table, context_name, body
 
         # layout
