@@ -1,20 +1,16 @@
 """Widgets for editing the 'key-display' annotation.
 """
 from PyQt5.QtWidgets import QVBoxLayout, QWidget
-from PyQt5.QtCore import pyqtSlot
 from deriva.core import tag, ermrest_model as _erm
 from .common import raise_on_invalid, MultipleChoicePropertyWidget
 from .markdown_patterns import MarkdownPatternForm
 from .sortkeys import SortKeysWidget
-from .tabbed_contexts import TabbedContextsWidget
+from .tabbed_contexts import EasyTabbedContextsWidget
 
 
-class KeyDisplayEditor(TabbedContextsWidget):
+class KeyDisplayEditor(EasyTabbedContextsWidget):
     """Editor for the key-display contexts.
     """
-
-    key: _erm.Key
-    body: dict
 
     def __init__(self, key: _erm.Key, parent: QWidget = None):
         """Initialize widget.
@@ -23,39 +19,13 @@ class KeyDisplayEditor(TabbedContextsWidget):
         :param parent: the parent widget
         """
         raise_on_invalid(key, _erm.Key, tag.key_display)
-        super(KeyDisplayEditor, self).__init__(parent=parent)
-        self.key = key
-        self.body = self.key.annotations[tag.key_display]
-        self.createContextRequested.connect(self._on_creatContext)
-        self.removeContextRequested.connect(self._on_removeContext)
-
-        # create tabs for each context
-        for context in self.body:
-            contents = self.body[context]
-            tab = _KeyDisplayContextEditor(self.key, contents, parent=self)
-            self.addContext(tab, context)
-
-        # set first context active
-        if self.body:
-            self.setActiveContext(list(self.body.keys())[0])
-
-    @pyqtSlot(str)
-    def _on_creatContext(self, context):
-        """Handles the 'createContextRequested' signal.
-        """
-        # create new context entry
-        self.body[context] = contents = {}
-
-        # create and add new context editor
-        contextEditor = _KeyDisplayContextEditor(self.key, contents, parent=self)
-        self.addContext(contextEditor, context)
-
-    @pyqtSlot(str)
-    def _on_removeContext(self, context):
-        """Handles the 'removeContextRequested' signal.
-        """
-        del self.body[context]
-        self.removeContext(context)
+        super(KeyDisplayEditor, self).__init__(
+            tag.key_display,
+            key.annotations,
+            create_context_value=lambda context: {},
+            create_context_widget_fn=lambda context, parent=None: _KeyDisplayContextEditor(key, key.annotations[tag.key_display][context], parent=parent),
+            purge_on_empty=False,
+            parent=parent)
 
 
 class _KeyDisplayContextEditor(MarkdownPatternForm):
