@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QVBoxLayout, QWidget, QGroupBox
 from deriva.core import tag
 from .editors import JSONEditor, AnnotationEditor, VisibleSourcesEditor, SourceDefinitionsEditor, CitationEditor, \
     TableDisplayContextsEditor, ForeignKeyAnnotationEditor, DisplayAnnotationEditor, AssetAnnotationEditor, \
-    KeyDisplayEditor
+    KeyDisplayEditor, ColumnDisplayEditor
 
 
 class SchemaEditor(QGroupBox):
@@ -41,30 +41,26 @@ class SchemaEditor(QGroupBox):
             widget = JSONEditor(value.get('acls'))
         elif 'acl_bindings' in value:
             widget = JSONEditor(value.get('acl_bindings'))
-        elif value.get('tag') == tag.visible_columns or value.get('tag') == tag.visible_foreign_keys:
+        elif 'tag' in value:
             assert value and isinstance(value, dict) and 'parent' in value
-            widget = VisibleSourcesEditor(value['parent'], value['tag'])
-        elif value.get('tag') == tag.source_definitions:
-            assert value and isinstance(value, dict) and 'parent' in value
-            widget = SourceDefinitionsEditor(value['parent'])
-        elif value.get('tag') == tag.citation:
-            assert value and isinstance(value, dict) and 'parent' in value
-            widget = CitationEditor(value['parent'])
-        elif value.get('tag') == tag.table_display:
-            assert value and isinstance(value, dict) and 'parent' in value
-            widget = TableDisplayContextsEditor(value['parent'])
-        elif value.get('tag') == tag.foreign_key:
-            assert value and isinstance(value, dict) and 'parent' in value
-            widget = ForeignKeyAnnotationEditor(value['parent'])
-        elif value.get('tag') == tag.display:
-            assert value and isinstance(value, dict) and 'parent' in value
-            widget = DisplayAnnotationEditor(value['parent'])
-        elif value.get('tag') == tag.asset:
-            assert value and isinstance(value, dict) and 'parent' in value
-            widget = AssetAnnotationEditor(value['parent'])
-        elif value.get('tag') == tag.key_display:
-            assert value and isinstance(value, dict) and 'parent' in value
-            widget = KeyDisplayEditor(value['parent'])
+            if value.get('tag') == tag.visible_columns or value.get('tag') == tag.visible_foreign_keys:
+                widget = VisibleSourcesEditor(value['parent'], value['tag'])
+            elif value.get('tag') == tag.source_definitions:
+                widget = SourceDefinitionsEditor(value['parent'])
+            elif value.get('tag') == tag.citation:
+                widget = CitationEditor(value['parent'])
+            elif value.get('tag') == tag.table_display:
+                widget = TableDisplayContextsEditor(value['parent'])
+            elif value.get('tag') == tag.foreign_key:
+                widget = ForeignKeyAnnotationEditor(value['parent'])
+            elif value.get('tag') == tag.display:
+                widget = DisplayAnnotationEditor(value['parent'])
+            elif value.get('tag') == tag.asset:
+                widget = AssetAnnotationEditor(value['parent'])
+            elif value.get('tag') == tag.key_display:
+                widget = KeyDisplayEditor(value['parent'])
+            elif value.get('tag') == tag.column_display:
+                widget = ColumnDisplayEditor(value['parent'])
         else:
             widget = AnnotationEditor(value)
 
