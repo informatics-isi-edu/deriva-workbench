@@ -1,21 +1,17 @@
 """Widgets for editing the 'table-display' annotation.
 """
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget, QGroupBox, QLabel
-from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtGui import QIntValidator
 from deriva.core import tag, ermrest_model as _erm
 from .common import SimpleTextPropertyWidget, SimpleBooleanPropertyWidget, raise_on_invalid
 from .markdown_patterns import MarkdownPatternForm
 from .sortkeys import SortKeysWidget
-from .tabbed_contexts import TabbedContextsWidget
+from .tabbed_contexts import EasyTabbedContextsWidget
 
 
-class TableDisplayContextsEditor(TabbedContextsWidget):
+class TableDisplayContextsEditor(EasyTabbedContextsWidget):
     """Editor for the table-display contexts.
     """
-
-    table: _erm.Table
-    body: dict
 
     def __init__(self, table: _erm.Table, parent: QWidget = None):
         """Initialize widget.
@@ -24,39 +20,14 @@ class TableDisplayContextsEditor(TabbedContextsWidget):
         :param parent: the parent widget
         """
         raise_on_invalid(table, _erm.Table, tag.table_display)
-        super(TableDisplayContextsEditor, self).__init__(parent=parent)
-        self.table = table
-        self.body = self.table.annotations[tag.table_display]
-        self.createContextRequested.connect(self._on_creatContext)
-        self.removeContextRequested.connect(self._on_removeContext)
-
-        # create tabs for each context
-        for context in self.body:
-            contents = self.body[context]
-            tab = TableDisplayEditor(self.table, context, contents, parent=self)
-            self.addContext(tab, context)
-
-        # set first context active
-        if self.body:
-            self.setActiveContext(list(self.body.keys())[0])
-
-    @pyqtSlot(str)
-    def _on_creatContext(self, context):
-        """Handles the 'createContextRequested' signal.
-        """
-        # create new context entry
-        self.body[context] = contents = {}
-
-        # create and add new context editor
-        contextEditor = TableDisplayEditor(self.table, context, contents, parent=self)
-        self.addContext(contextEditor, context)
-
-    @pyqtSlot(str)
-    def _on_removeContext(self, context):
-        """Handles the 'removeContextRequested' signal.
-        """
-        del self.body[context]
-        self.removeContext(context)
+        super(TableDisplayContextsEditor, self).__init__(
+            tag.table_display,
+            table.annotations,
+            create_context_value=lambda context: {},
+            create_context_widget_fn=lambda context, parent = None: TableDisplayEditor(table, context, table.annotations[tag.table_display][context], parent=parent),
+            purge_on_empty=False,
+            parent=parent
+        )
 
 
 __markdown_pattern_field_keys__ = [
