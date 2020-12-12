@@ -2,7 +2,8 @@
 """
 import logging
 from typing import Callable
-from PyQt5.QtWidgets import QWidget, QTabWidget, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QLineEdit, QMessageBox
+from PyQt5.QtWidgets import QWidget, QTabWidget, QFormLayout, QLabel, QComboBox, QPushButton, QVBoxLayout, QLineEdit, \
+    QMessageBox
 from PyQt5.QtCore import pyqtSlot, pyqtSignal
 
 logger = logging.getLogger(__name__)
@@ -12,10 +13,15 @@ class TabbedContextsWidget(QWidget):
     """Tabbed widget for managing annotation contexts.
     """
 
-    createContextRequested = pyqtSignal(str)
+    createContextRequested = pyqtSignal(str, str)
     removeContextRequested = pyqtSignal(str)
 
-    def __init__(self, parent: QWidget = None):
+    def __init__(self, allow_context_reference: bool = False, parent: QWidget = None):
+        """Initialize the widget.
+
+        :param allow_context_reference: when adding a new context, allow context references
+        :param parent: the parent widget
+        """
         super(TabbedContextsWidget, self).__init__(parent=parent)
         self._context_names: [str] = []
 
@@ -31,24 +37,32 @@ class TabbedContextsWidget(QWidget):
         self._tabs.tabCloseRequested.connect(self._on_tabCloseRequested)
         layout.addWidget(self._tabs)
 
-        # initialize the 'create' context tab
-        createTab = QWidget(parent=self)
-        createTab.setLayout(QHBoxLayout())
-        # ...label
-        createTab.layout().addWidget(QLabel('Context Name:'))
+        # initialize the 'add' context tab
+        addContextTab = QWidget(parent=self)
+        form = QFormLayout(addContextTab)
+        addContextTab.setLayout(form)
+
         # ...line edit
-        self._contextNameLineEdit = QLineEdit()
+        self._contextNameLineEdit = QLineEdit(parent=addContextTab)
         self._contextNameLineEdit.setPlaceholderText('Enter a unique context name')
         self._contextNameLineEdit.textChanged.connect(self._on_contextName_textChanged)
         self._contextNameLineEdit.returnPressed.connect(self._on_contextName_createEvent)
-        createTab.layout().addWidget(self._contextNameLineEdit)
+        form.addRow(self.tr('Context Name'), self._contextNameLineEdit)
+
+        # ...reference existing
+        self._referenceExistingComboBox = QComboBox()
+        self._referenceExistingComboBox.setPlaceholderText(self.tr('Select an existing context (optional)'))
+        self._referenceExistingComboBox.addItems(self._context_names)
+        if allow_context_reference:
+            form.addRow(self.tr('Reference Existing'), self._referenceExistingComboBox)
+
         # ...create button
         self._createButton = QPushButton('Add')
         self._createButton.setEnabled(False)
         self._createButton.clicked.connect(self._on_contextName_createEvent)
-        createTab.layout().addWidget(self._createButton)
-        createTab.setAutoFillBackground(True)
-        self._tabs.addTab(createTab, '<add>')
+        addContextTab.layout().addWidget(self._createButton)
+        addContextTab.setAutoFillBackground(True)
+        self._tabs.addTab(addContextTab, '<add>')
 
     @pyqtSlot()
     def _on_contextName_textChanged(self):
@@ -65,7 +79,8 @@ class TabbedContextsWidget(QWidget):
         """Handles create button clicked signals.
         """
         self.createContextRequested.emit(
-            self._contextNameLineEdit.text()
+            self._contextNameLineEdit.text(),
+            self._referenceExistingComboBox.currentText()
         )
         self._contextNameLineEdit.setText('')
 
@@ -117,6 +132,8 @@ class TabbedContextsWidget(QWidget):
         if context_name in self._context_names:
             logger.warning('"%s" already exists in tabbed contexts' % context_name)
         self._context_names.append(context_name)
+        self._referenceExistingComboBox.clear()
+        self._referenceExistingComboBox.addItems(self._context_names)
         self._tabs.insertTab(self._tabs.count()-1, context_widget, context_name)
 
     def removeContext(self, context: str) -> None:
@@ -125,6 +142,8 @@ class TabbedContextsWidget(QWidget):
         try:
             index = self._context_names.index(context)
             del self._context_names[index]
+            self._referenceExistingComboBox.clear()
+            self._referenceExistingComboBox.addItems(self._context_names)
             self._tabs.removeTab(index)
         except ValueError:
             logger.error('Context "%s" not found' % context)
@@ -148,6 +167,7 @@ class EasyTabbedContextsWidget(TabbedContextsWidget):
                  create_context_value: Callable,
                  create_context_widget_fn: Callable,
                  purge_on_empty: bool = True,
+                 allow_context_reference: bool = False,
                  parent: QWidget = None):
         """Initialize the widget.
 
@@ -158,9 +178,10 @@ class EasyTabbedContextsWidget(TabbedContextsWidget):
         :param create_context_widget_fn: function to create an editor widget to manage a context; it must accept a
                 context name string and an optional parent object, and it may return an instance of QWidget.
         :param purge_on_empty: if all contexts are removed, purge the 'key' from the 'body'
+        :param allow_context_reference: when adding a new context, allow context references
         :param parent: this widget's parent
         """
-        super(EasyTabbedContextsWidget, self).__init__(parent=parent)
+        super(EasyTabbedContextsWidget, self).__init__(allow_context_reference=allow_context_reference, parent=parent)
         self.key, self.body = key, body
         self.create_context_value = create_context_value
         self.create_context_widget_fn = create_context_widget_fn
@@ -171,9 +192,9 @@ class EasyTabbedContextsWidget(TabbedContextsWidget):
         self.removeContextRequested.connect(self._on_removeContextRequested)
 
         # create widgets for contexts
-        for context in self.body.get(key, {}):
+        for context, value in self.body.get(key, {}).items():
             self.addContext(
-                self.create_context_widget_fn(context, parent=self),
+                self._referenceWidget(value) if allow_context_reference and isinstance(value, str) else self.create_context_widget_fn(context, parent=self),
                 context
             )
 
@@ -181,20 +202,24 @@ class EasyTabbedContextsWidget(TabbedContextsWidget):
         if self._tabs.count():
             self.setActiveContextByIndex(0)
 
-    @pyqtSlot(str)
-    def _on_createContextRequested(self, context):
+    def _referenceWidget(self, context_name):
+        """Returns the widget to represent a context that references another context.
+        """
+        widget = QWidget(parent=self)
+        widget.setLayout(QFormLayout(widget))
+        widget.layout().addWidget(QLabel(self.tr('This context references: ') + context_name, parent=self))
+        return widget
+
+    @pyqtSlot(str, str)
+    def _on_createContextRequested(self, context, reference):
         """Handles the 'createContextRequested' signal.
         """
-        # create new context entry
         self.body[self.key] = self.body.get(self.key, {})
-        self.body[self.key][context] = self.create_context_value(context)
-
-        # create and add new context editor
+        self.body[self.key][context] = reference if reference else self.create_context_value(context)
         self.addContext(
-            self.create_context_widget_fn(context, parent=self),
+            self._referenceWidget(reference) if reference else self.create_context_widget_fn(context, parent=self),
             context
         )
-        # emit
         self.valueChanged.emit()
 
     @pyqtSlot(str)
@@ -205,5 +230,4 @@ class EasyTabbedContextsWidget(TabbedContextsWidget):
         if self.purge_on_empty and not self.body[self.key]:
             del self.body[self.key]
         self.removeContext(context)
-        # emit
         self.valueChanged.emit()

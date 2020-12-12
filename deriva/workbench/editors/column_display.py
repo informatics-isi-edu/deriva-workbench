@@ -26,6 +26,7 @@ class ColumnDisplayEditor(EasyTabbedContextsWidget):
             create_context_value=lambda context: {},
             create_context_widget_fn=lambda context, parent=None: _ColumnDisplayContextEditor(column, column.annotations[tag.column_display][context], parent=parent),
             purge_on_empty=False,
+            allow_context_reference=True,
             parent=parent)
 
 

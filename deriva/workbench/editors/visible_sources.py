@@ -93,6 +93,7 @@ class VisibleSourcesEditor(EasyTabbedContextsWidget):
             create_context_value=lambda context: _create_context_value(tag, context),
             create_context_widget_fn=lambda context, parent=None: _create_visible_source_context_editor(table, tag, table.annotations[tag], context, parent=parent),
             purge_on_empty=False,
+            allow_context_reference=True,
             parent=parent
         )
 
