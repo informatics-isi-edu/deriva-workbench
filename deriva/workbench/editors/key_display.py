@@ -32,7 +32,7 @@ class KeyDisplayEditor(TabbedContextsWidget):
         # create tabs for each context
         for context in self.body:
             contents = self.body[context]
-            tab = KeyDisplayContextEditor(self.key, contents, parent=self)
+            tab = _KeyDisplayContextEditor(self.key, contents, parent=self)
             self.addContext(tab, context)
 
         # set first context active
@@ -47,7 +47,7 @@ class KeyDisplayEditor(TabbedContextsWidget):
         self.body[context] = contents = {}
 
         # create and add new context editor
-        contextEditor = KeyDisplayContextEditor(self.key, contents, parent=self)
+        contextEditor = _KeyDisplayContextEditor(self.key, contents, parent=self)
         self.addContext(contextEditor, context)
 
     @pyqtSlot(str)
@@ -58,7 +58,7 @@ class KeyDisplayEditor(TabbedContextsWidget):
         self.removeContext(context)
 
 
-class KeyDisplayContextEditor(MarkdownPatternForm):
+class _KeyDisplayContextEditor(MarkdownPatternForm):
     """Editor for a key-display annotation (single entry).
     """
 
@@ -71,7 +71,7 @@ class KeyDisplayContextEditor(MarkdownPatternForm):
         :param body: the annotation body for the given context
         :param parent: the parent widget
         """
-        super(KeyDisplayContextEditor, self).__init__(
+        super(_KeyDisplayContextEditor, self).__init__(
             [('markdown_pattern', 'Markdown Pattern')],
             body,
             include_template_engine=True,
