@@ -77,8 +77,8 @@ body or remove an annotation by removing its key and body from the document.
 
 The workbench currently provides enhanced support for several key annotations, including 
 `visible-columns`, `visible-foreign-keys`, `source-definitions`, `table-display`, 
-`citation`, `display`, `foreign-key`, `asset`, and `key-display`. For all other annotations, 
-the workbench will fall back to the JSON editor.
+`citation`, `display`, `foreign-key`, `asset`, `key-display`, and `column-display`. For 
+all other annotations, the workbench will fall back to the JSON editor.
 
 #### a. Editing `visible-columns`
 
