@@ -64,14 +64,11 @@ class WorkbenchWindow(QMainWindow):
 
     @pyqtSlot()
     def _on_browser_itemSelected(self):
-        if self.ui.browser.lastItemSelected and hasattr(self.ui.browser.lastItemSelected, 'annotations'):
-            self.ui.actionValidate.setEnabled(True)
-            self.ui.actionDumpAnnotations.setEnabled(True)
-            self.ui.actionRestoreAnnotations.setEnabled(True)
-        else:
-            self.ui.actionValidate.setEnabled(False)
-            self.ui.actionDumpAnnotations.setEnabled(False)
-            self.ui.actionRestoreAnnotations.setEnabled(False)
+        """Handles schema browser item selection event.
+
+        The purpose is to enable actions, as appropriate for the currently selected model object.
+        """
+        self.enableControls()
 
     def configure(self, hostname, catalog_id):
         """Configures the connection properties.
@@ -182,24 +179,32 @@ class WorkbenchWindow(QMainWindow):
         queryTask.query()
 
     def enableControls(self):
-        self.ui.actionUpdate.setEnabled(self.connection.get("catalog") is not None and self.identity is not None)  # and self.auth_window.authenticated())
-        self.ui.actionRefresh.setEnabled(self.connection.get("catalog") is not None)
+        """Conditionally, enable actions based on state of user session and schema browser.
+        """
+        # ...check the capabilities of currently selected item
+        has_apply = hasattr(self.ui.browser.lastItemSelected, 'apply')
         has_annotations = hasattr(self.ui.browser.lastItemSelected, 'annotations')
+        # ...enable actions
+        self.ui.actionUpdate.setEnabled(has_apply and self.identity is not None)
+        self.ui.actionRefresh.setEnabled(self.connection.get("catalog") is not None)
         self.ui.actionValidate.setEnabled(has_annotations)
         self.ui.actionDumpAnnotations.setEnabled(has_annotations)
         self.ui.actionRestoreAnnotations.setEnabled(has_annotations)
         self.ui.actionCancel.setEnabled(False)
         self.ui.actionOptions.setEnabled(True)
-        self.ui.actionLogin.setEnabled(self.identity is None)  # not self.auth_window.authenticated())
-        self.ui.actionLogout.setEnabled(self.identity is not None)  # self.auth_window.authenticated())
+        self.ui.actionLogin.setEnabled(self.identity is None)
+        self.ui.actionLogout.setEnabled(self.identity is not None)
         self.ui.actionExit.setEnabled(True)
 
-    def disableControls(self):
+    def disableControls(self, allow_cancel=False):
+        """Disable all actions with option to allow cancel action.
+        """
         self.ui.actionUpdate.setEnabled(False)
         self.ui.actionRefresh.setEnabled(False)
         self.ui.actionValidate.setEnabled(False)
         self.ui.actionDumpAnnotations.setEnabled(False)
         self.ui.actionRestoreAnnotations.setEnabled(False)
+        self.ui.actionCancel.setEnabled(allow_cancel)
         self.ui.actionOptions.setEnabled(False)
         self.ui.actionLogin.setEnabled(False)
         self.ui.actionLogout.setEnabled(False)
@@ -275,6 +280,8 @@ class WorkbenchWindow(QMainWindow):
 
     @pyqtSlot()
     def on_actionRefresh_triggered(self):
+        """Handle actionRefresh event.
+        """
         # check if connected to a catalog
         if not self.connection["catalog"]:
             self.updateStatus("Cannot fetch model. Not connected to a catalog.")
@@ -284,13 +291,15 @@ class WorkbenchWindow(QMainWindow):
         self.fetchCatalogModel()
 
     def fetchCatalogModel(self, reset=False):
+        """Fetch catalog model and refresh local state.
+        """
         if reset:
             self.connection["catalog"] = self.connection["server"].connect_ermrest(self.connection["catalog_id"])
         fetchTask = FetchCatalogModelTask(self.connection)
         fetchTask.status_update_signal.connect(self.onFetchCatalogModelResult)
         fetchTask.fetch()
         qApp.setOverrideCursor(Qt.WaitCursor)
-        self.ui.actionCancel.setEnabled(True)
+        self.disableControls(allow_cancel=True)
 
     @pyqtSlot(bool, str, str, object)
     def onFetchCatalogModelResult(self, success, status, detail, result):
@@ -308,7 +317,7 @@ class WorkbenchWindow(QMainWindow):
 
     @pyqtSlot()
     def on_actionValidate_triggered(self):
-        """Triggered on "validate" action.
+        """Handle actionValidate event.
         """
         # check if connected to a catalog
         if not self.connection["catalog"]:
@@ -323,15 +332,15 @@ class WorkbenchWindow(QMainWindow):
         # do validation
         self.validatAnnotations(model_obj)
 
-    def validatAnnotations(self, current_selection):
-        """Fires off annotation validation task.
+    def validatAnnotations(self, model_object):
+        """Validate annotations for selected model object.
         """
-        assert hasattr(current_selection, 'annotations'), "Current selection does not have 'annotations'."
-        task = ValidateAnnotationsTask(current_selection, self.connection)
+        assert hasattr(model_object, 'annotations'), "Current selection does not have 'annotations' attribute."
+        task = ValidateAnnotationsTask(model_object, self.connection)
         task.status_update_signal.connect(self.onValidateAnnotationsResult)
         task.validate()
         qApp.setOverrideCursor(Qt.WaitCursor)
-        self.ui.actionCancel.setEnabled(True)
+        self.disableControls(allow_cancel=True)
 
     @pyqtSlot(bool, str, str, object)
     def onValidateAnnotationsResult(self, success, status, detail, result):
@@ -356,18 +365,39 @@ class WorkbenchWindow(QMainWindow):
 
     @pyqtSlot()
     def on_actionUpdate_triggered(self):
-        model = self.ui.browser.model
-        task = ModelApplyTask(model, self.connection)
+        """Handles actionUpdate event.
+        """
+        # validate current selected model obj
+        model_object = self.ui.browser.lastItemSelected
+        if not hasattr(model_object, 'apply'):
+            error = self.tr("Cannot apply annotations. Current selected object does not have 'apply' attribute.")
+            QMessageBox.critical(
+                self,
+                self.tr("Failed to Apply Changes"),
+                error
+            )
+            self.updateStatus(error)
+        else:
+            self.modelApply(model_object)
+
+    def modelApply(self, model_object):
+        """Apply model changes on model object.
+
+        :param model_object: an ermrest model object
+        """
+        task = ModelApplyTask(model_object, self.connection)
         task.status_update_signal.connect(self.onModelApplyResult)
-        task.apply()
+        task.start()
         qApp.setOverrideCursor(Qt.WaitCursor)
-        self.ui.actionCancel.setEnabled(True)
+        self.disableControls(allow_cancel=True)
 
     @pyqtSlot(bool, str, str, object)
     def onModelApplyResult(self, success, status, detail, result):
+        """Handles model apply results.
+        """
         self.restoreCursor()
         if success:
-            self.resetUI("Successfully updated catalog ACLs and annotations.")
+            self.resetUI("Successfully updated catalog annotations.")
         else:
             self.resetUI(status, detail, success)
 
@@ -414,7 +444,7 @@ class WorkbenchWindow(QMainWindow):
         task.status_update_signal.connect(self.onDumpAnnotationsResult)
         task.start()
         qApp.setOverrideCursor(Qt.WaitCursor)
-        self.ui.actionCancel.setEnabled(True)
+        self.disableControls(allow_cancel=True)
 
     @pyqtSlot(bool, str, str, object)
     def onDumpAnnotationsResult(self, success, status, detail, result):
@@ -476,7 +506,7 @@ class WorkbenchWindow(QMainWindow):
         task.status_update_signal.connect(self.onRestoreAnnotationsResult)
         task.start()
         qApp.setOverrideCursor(Qt.WaitCursor)
-        self.ui.actionCancel.setEnabled(True)
+        self.disableControls(allow_cancel=True)
 
     @pyqtSlot(bool, str, str, object)
     def onRestoreAnnotationsResult(self, success, status, detail, result):

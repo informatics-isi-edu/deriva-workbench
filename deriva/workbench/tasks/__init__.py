@@ -47,11 +47,11 @@ class ModelApplyTask(WorkbenchTask):
     """Applies the changes to the catalog configuration (acls and annotations).
     """
 
-    def __init__(self, model, connection, parent=None):
+    def __init__(self, model_obj, connection, parent=None):
         super(ModelApplyTask, self).__init__(connection, parent)
-        assert connection.get('catalog')
-        assert model
-        self.model = model
+        assert connection.get('catalog'), 'Invalid server connection. Must have "catalog" property.'
+        assert model_obj and hasattr(model_obj, 'apply'), 'Invalid catalog model object. Must have "apply" attribute.'
+        self.model_obj = model_obj
 
     def result_callback(self, success, result):
         self.set_status(success,
@@ -59,9 +59,13 @@ class ModelApplyTask(WorkbenchTask):
                         "" if success else format_exception(result),
                         result if success else None)
 
-    def apply(self):
-        self.task = Task(self.model.apply, [], self.result_callback)
-        self.start()
+    def start(self):
+        self.task = Task(
+            self.model_obj.apply,
+            [],
+            self.result_callback
+        )
+        super(ModelApplyTask, self).start()
 
 
 class ValidateAnnotationsTask(WorkbenchTask):
