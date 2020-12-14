@@ -164,6 +164,14 @@ class SchemaBrowser(QGroupBox):
         self.lastItemSelected = index.data(Qt.UserRole)
         self.itemSelected.emit()
 
+    def clear(self) -> None:
+        """Clear the state of the browser.
+        """
+        self.lastItemSelected = self.lastItemOpened = None
+        treeView = self._create_treeView()
+        self.layout().replaceWidget(self._treeView, treeView)
+        self._treeView = treeView
+
     def setModel(self, model: _erm.Model) -> None:
         """Sets the ermrest model for the browser.
 

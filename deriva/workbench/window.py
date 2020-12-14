@@ -588,7 +588,7 @@ class WorkbenchWindow(QMainWindow):
                                                              credentials=get_credential(self.connection['host']))
 
                     # clear out any schema editor state
-                    self.ui.browser.setModel(None)
+                    self.ui.browser.clear()
                     self.ui.editor.data = None
 
                     # begin login sequence
