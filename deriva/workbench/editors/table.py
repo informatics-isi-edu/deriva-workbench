@@ -73,6 +73,7 @@ class CommonTableWidget(QWidget):
             headers_fn: Callable = None,
             row_fn: Callable = None,
             resize_mode: QHeaderView.ResizeMode = QHeaderView.Stretch,
+            allow_copy: bool = False,
             truth_fn: Callable = bool,
             parent: QWidget = None
     ):
@@ -99,6 +100,7 @@ class CommonTableWidget(QWidget):
         :param headers_fn: a function that takes the property as input and returns a list of text for the table header
         :param row_fn: a function that takes an item from the property and returns a flattened tuple for the row value
         :param resize_mode: the resize mode applied to the table view
+        :param allow_copy: allow copying (duplication) of table items
         :param truth_fn: function applied to value to determine whether it should be set or dropped from body
         :param parent: parent widget
         """
@@ -139,9 +141,10 @@ class CommonTableWidget(QWidget):
         removeElement.clicked.connect(self.on_remove_click)
         hlayout.addWidget(removeElement)
         # ...duplicate column button
-        copyElement = QPushButton('copy', parent=controls)
-        copyElement.clicked.connect(self.on_duplicate_click)
-        hlayout.addWidget(copyElement)
+        if allow_copy:
+            copyElement = QPushButton('copy', parent=controls)
+            copyElement.clicked.connect(self.on_duplicate_click)
+            hlayout.addWidget(copyElement)
         # ...move up button
         moveUp = QPushButton('up', parent=controls)
         moveUp.clicked.connect(self.on_move_up_click)
