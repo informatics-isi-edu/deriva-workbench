@@ -229,11 +229,14 @@ class PseudoColumnEditWidget(QTabWidget):
         form.addWidget(QLabel("The options on this form apply only when the pseudo-column is used as a facet.", parent=facetTab))
 
         # ...open
-        form.addRow("Open", SimpleBooleanPropertyWidget(
-            'Open the facet by default',
+        form.addRow("Open", MultipleChoicePropertyWidget(
             'open',
             self.entry,
-            truth_fn=lambda x: x is not None,
+            {
+                "Open the facet by default": True,
+                "Close the facet by default": False,
+                "Default behavior": None
+            },
             parent=facetTab
         ))
 
