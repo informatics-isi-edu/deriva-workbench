@@ -397,6 +397,7 @@ class WorkbenchWindow(QMainWindow):
         """
         self.restoreCursor()
         if success:
+            self.ui.editor.data = self.ui.browser.lastItemOpened
             self.resetUI("Successfully updated catalog annotations.")
         else:
             self.resetUI(status, detail, success)
