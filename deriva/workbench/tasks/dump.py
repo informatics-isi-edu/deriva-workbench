@@ -197,7 +197,7 @@ class RestoreAnnotationsTask(WorkbenchTask):
         super(RestoreAnnotationsTask, self).start()
 
 
-def restore_annotations_recursive(model_obj, root:str) -> None:
+def restore_annotations_recursive(model_obj, root: str) -> None:
     """Recursively restores annotations of 'model_obj' in a model hierarchy rooted under 'root'.
 
     :param model_obj: an ermrest model object that has 'annotations' property

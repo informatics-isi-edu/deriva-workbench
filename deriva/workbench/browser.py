@@ -66,6 +66,7 @@ class SchemaBrowser(QGroupBox):
         :param parent: the parent widget
         """
         super(SchemaBrowser, self).__init__('Schema Browser', parent=parent)
+        self.model = None
         self.lastItemSelected = self.lastItemOpened = None
         self._treeView = self._create_treeView()
 
@@ -182,6 +183,12 @@ class SchemaBrowser(QGroupBox):
         self.layout().replaceWidget(self._treeView, treeView)
         self._treeView = treeView
 
+    def reset(self) -> None:
+        """Resets the state of the browser using the current 'model' property.
+        """
+        if self.model:
+            self.setModel(self.model)
+
     def setModel(self, model: _erm.Model) -> None:
         """Sets the ermrest model for the browser.
 
@@ -189,6 +196,8 @@ class SchemaBrowser(QGroupBox):
 
         :param model: an ermrest Model instance
         """
+        assert isinstance(model, _erm.Model), "Invalid 'model' object passed to schema browser"
+        self.model = model
         self.lastItemSelected = self.lastItemOpened = None
 
         def add_annotations(parent: _SchemaBrowserItem, obj: Any):
@@ -233,51 +242,50 @@ class SchemaBrowser(QGroupBox):
         add_acls(rootNode, model)
         treeModel.appendRow(rootNode)
 
-        if model:
-            # add schemas
-            for schema in model.schemas.values():
-                schemaItem = _SchemaBrowserItem(schema.name, schema, 12, set_bold=True)
-                add_annotations(schemaItem, schema)
-                add_acls(schemaItem, schema)
+        # add schemas
+        for schema in model.schemas.values():
+            schemaItem = _SchemaBrowserItem(schema.name, schema, 12, set_bold=True)
+            add_annotations(schemaItem, schema)
+            add_acls(schemaItem, schema)
 
-                # add tables
-                tablesItem = _SchemaBrowserItem('tables', None, 12)
-                schemaItem.appendRow(tablesItem)
-                for table in schema.tables.values():
-                    tableItem = _SchemaBrowserItem(table.name, table, 12)
-                    add_annotations(tableItem, table)
-                    add_acls(tableItem, table)
+            # add tables
+            tablesItem = _SchemaBrowserItem('tables', None, 12)
+            schemaItem.appendRow(tablesItem)
+            for table in schema.tables.values():
+                tableItem = _SchemaBrowserItem(table.name, table, 12)
+                add_annotations(tableItem, table)
+                add_acls(tableItem, table)
 
-                    # add columns
-                    colsItem = _SchemaBrowserItem('columns', None, 12, color=_columnColor)
-                    tableItem.appendRow(colsItem)
-                    for col in table.columns:
-                        colItem = _SchemaBrowserItem(col.name, col, 12, color=_columnColor)
-                        add_annotations(colItem, col)
-                        add_acls(colItem, col)
-                        colsItem.appendRow(colItem)
+                # add columns
+                colsItem = _SchemaBrowserItem('columns', None, 12, color=_columnColor)
+                tableItem.appendRow(colsItem)
+                for col in table.columns:
+                    colItem = _SchemaBrowserItem(col.name, col, 12, color=_columnColor)
+                    add_annotations(colItem, col)
+                    add_acls(colItem, col)
+                    colsItem.appendRow(colItem)
 
-                    # add keys
-                    keysItem = _SchemaBrowserItem('keys', None, 12, color=_keyColor)
-                    tableItem.appendRow(keysItem)
-                    for key in table.keys:
-                        keyItem = _SchemaBrowserItem(key.constraint_name, key, 12, color=_keyColor)
-                        add_annotations(keyItem, key)
-                        keysItem.appendRow(keyItem)
+                # add keys
+                keysItem = _SchemaBrowserItem('keys', None, 12, color=_keyColor)
+                tableItem.appendRow(keysItem)
+                for key in table.keys:
+                    keyItem = _SchemaBrowserItem(key.constraint_name, key, 12, color=_keyColor)
+                    add_annotations(keyItem, key)
+                    keysItem.appendRow(keyItem)
 
-                    # add fkeys
-                    fkeysItem = _SchemaBrowserItem('foreign keys', None, 12, color=_fkeyColor)
-                    tableItem.appendRow(fkeysItem)
-                    for fkey in table.foreign_keys:
-                        fkeyItem = _SchemaBrowserItem(fkey.constraint_name, fkey, 12, color=_fkeyColor)
-                        add_annotations(fkeyItem, fkey)
-                        add_acls(fkeyItem, fkey)
-                        fkeysItem.appendRow(fkeyItem)
+                # add fkeys
+                fkeysItem = _SchemaBrowserItem('foreign keys', None, 12, color=_fkeyColor)
+                tableItem.appendRow(fkeysItem)
+                for fkey in table.foreign_keys:
+                    fkeyItem = _SchemaBrowserItem(fkey.constraint_name, fkey, 12, color=_fkeyColor)
+                    add_annotations(fkeyItem, fkey)
+                    add_acls(fkeyItem, fkey)
+                    fkeysItem.appendRow(fkeyItem)
 
-                    tablesItem.appendRow(tableItem)
-                schemasNode.appendRow(schemaItem)
+                tablesItem.appendRow(tableItem)
+            schemasNode.appendRow(schemaItem)
 
-            rootNode.sortChildren(0)
+        rootNode.sortChildren(0)
 
         # create new and replace old treeview
         treeView = self._create_treeView(treeModel)

@@ -522,6 +522,8 @@ class WorkbenchWindow(QMainWindow):
         """
         self.restoreCursor()
         if success:
+            self.ui.browser.reset()
+            self.ui.editor.data = None
             msg = self.tr("Annotations restored successfully")
             QMessageBox.information(
                 self,
