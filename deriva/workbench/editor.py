@@ -43,7 +43,9 @@ class SchemaEditor(QGroupBox):
             widget = JSONEditor(value.get('acl_bindings'))
         elif 'tag' in value:
             assert value and isinstance(value, dict) and 'parent' in value
-            if value.get('tag') == tag.visible_columns or value.get('tag') == tag.visible_foreign_keys:
+            if value.get('as_source'):
+                widget = AnnotationEditor(value)
+            elif value.get('tag') == tag.visible_columns or value.get('tag') == tag.visible_foreign_keys:
                 widget = VisibleSourcesEditor(value['parent'], value['tag'])
             elif value.get('tag') == tag.source_definitions:
                 widget = SourceDefinitionsEditor(value['parent'])

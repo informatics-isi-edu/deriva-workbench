@@ -89,15 +89,19 @@ class SchemaBrowser(QGroupBox):
 
         return treeView
 
-    def _selectAndOpen(self, index: QModelIndex):
+    def _selectAndOpen(self, index: QModelIndex, as_source: bool = False):
         """Select and open an item.
 
         :param index: the tree model index to select and open
+        :param as_source: flag passed in payload for editor to interpret
         """
         selection = self._treeView.selectionModel()
         selection.clear()
         selection.select(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
-        self.lastItemSelected = self.lastItemOpened = index.data(Qt.UserRole)
+        data = index.data(Qt.UserRole).copy()
+        if as_source:
+            data['as_source'] = as_source
+        self.lastItemSelected = self.lastItemOpened = data
         self.itemOpened.emit()
         self.itemSelected.emit()
 
@@ -121,7 +125,9 @@ class SchemaBrowser(QGroupBox):
             if __tag__ in data:
                 # case: specific annotation selected
                 tag = data[__tag__]
-                deleteAction = menu.addAction('Delete "%s"' % tag)
+                editAction = menu.addAction('Edit')
+                editAsJSONAction = menu.addAction('Edit Source')
+                deleteAction = menu.addAction('Delete')
                 action = menu.exec_(self.mapToGlobal(pos))
                 if action == deleteAction:
                     reply = QMessageBox.question(
@@ -134,6 +140,10 @@ class SchemaBrowser(QGroupBox):
                         del model_obj.annotations[tag]
                         index.model().removeRow(index.row(), index.parent())
                         self._selectAndOpen(index.parent())
+                elif action == editAction:
+                    self._selectAndOpen(index)
+                elif action == editAsJSONAction:
+                    self._selectAndOpen(index, as_source=True)
 
             else:
                 # case: all annotations selected
