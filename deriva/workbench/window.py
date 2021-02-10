@@ -58,6 +58,14 @@ class WorkbenchWindow(QMainWindow):
         self.config = None
         self.configure(hostname, catalog_id)
 
+    @classmethod
+    def _connect_ermrest(cls, server, catalog_id):
+        """Helper to connect ermrest catalog.
+        """
+        catalog = server.connect_ermrest(catalog_id)
+        catalog.dcctx['cid'] = "gui/WorkbenchApp"
+        return catalog
+
     @pyqtSlot()
     def _on_browser_itemOpened(self):
         self.ui.editor.data = self.ui.browser.lastItemOpened
@@ -166,7 +174,7 @@ class WorkbenchWindow(QMainWindow):
         self.connection["credential"] = kwargs["credential"]
         server = DerivaServer(self.connection.get('protocol', 'https'), self.connection['host'], credentials=kwargs["credential"])
         self.connection["server"] = server
-        self.connection["catalog"] = server.connect_ermrest(self.connection["catalog_id"])
+        self.connection["catalog"] = self._connect_ermrest(server, self.connection["catalog_id"])
         self.getSession()
 
     def getSession(self):
@@ -268,7 +276,7 @@ class WorkbenchWindow(QMainWindow):
             display_name = result["client"]["full_name"]
             self.setWindowTitle("%s (%s - %s)" % (self.ui.title, self.connection["host"], display_name))
             self.updateStatus("Logged in.")
-            self.connection["catalog"] = self.connection["server"].connect_ermrest(self.connection["catalog_id"])
+            self.connection["catalog"] = self._connect_ermrest(self.connection["server"], self.connection["catalog_id"])
             self.enableControls()
             self.fetchCatalogModel()
         else:
@@ -294,7 +302,7 @@ class WorkbenchWindow(QMainWindow):
         """Fetch catalog model and refresh local state.
         """
         if reset:
-            self.connection["catalog"] = self.connection["server"].connect_ermrest(self.connection["catalog_id"])
+            self.connection["catalog"] = self._connect_ermrest(self.connection["server"], self.connection["catalog_id"])
         fetchTask = FetchCatalogModelTask(self.connection)
         fetchTask.status_update_signal.connect(self.onFetchCatalogModelResult)
         fetchTask.fetch()
