@@ -45,8 +45,8 @@ setup(
         ]
     },
     install_requires=[
-        'deriva>=1.0.0',
-        'deriva-qt>=1.3.1'
+        'deriva>=1.5.0',
+        'deriva-qt>=1.5.0'
     ],
     extras_require={
         'PyQt5': ["PyQt5==5.11.3"],
