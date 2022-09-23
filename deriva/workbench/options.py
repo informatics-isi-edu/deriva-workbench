@@ -281,13 +281,11 @@ class ServerDialog(QDialog):
             return False
 
         # validate catalog identifier
-        try:
-            catalog_id = int(self.catalogIDTextBox.text())
-            self.server[__catalog_id__] = catalog_id
-        except ValueError:
+        catalog_id = self.catalogIDTextBox.text()
+        if not catalog_id:
             _warningMessageBox(self.parent(),
-                               self.tr("Please enter a valid catalog identifier."),
-                               "A catalog identifier should be a number such as \'1\', \'1138\', etc.")
+                               self.tr("Please enter a valid catalog identifier or alias."),
+                               "This field cannot be left blank.")
             return False
 
         # validate description
