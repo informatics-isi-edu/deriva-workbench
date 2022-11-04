@@ -1,8 +1,7 @@
 # deriva-workbench
 
 Schema workbench for DERIVA platform. This application can be used to browse 
-and update DERIVA catalog annotations. Currently, this project is availabe as a 
-**development preview** only.
+and update DERIVA catalog annotations.
 
 ## Requirements
 
@@ -21,10 +20,16 @@ $ pip3 install --upgrade PyQt5
 $ pip3 install --upgrade PyQtWebEngine
 ```
 
-Install the `deriva-workbench` from its GIT repository.
+Install the `deriva-workbench` from PyPI repository. (*Recommended*)
 
 ```shell script
-$ pip3 install --upgrade git+https://github.com/informatics-isi-edu/deriva-workbench
+$ pip install deriva-workbench
+```
+
+To use the latest code under development, install the `deriva-workbench` from its GIT repository.
+
+```shell script
+$ pip install --upgrade git+https://github.com/informatics-isi-edu/deriva-workbench
 ```
 
 ## Usage
