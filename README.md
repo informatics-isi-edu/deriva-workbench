@@ -3,38 +3,17 @@
 Schema workbench for DERIVA platform. This application can be used to browse 
 and update DERIVA catalog annotations.
 
-## Requirements
-
-* Python 3.x
-* PyQt5 (5.11.3+)
-* PyQtWebEngine (5.12.1+)
-* The application has been tested on Mac OS though it should work on Windows and Linux.
-
 ## Installation
 
-These steps assume you have a recent Python 3.x environment installed. Next, 
-install the PyQt dependencies.
-
-```shell script
-$ pip3 install --upgrade PyQt5
-$ pip3 install --upgrade PyQtWebEngine
-```
-
-Install the `deriva-workbench` from PyPI repository. (*Recommended*)
-
-```shell script
-$ pip install deriva-workbench
-```
-
-To use the latest code under development, install the `deriva-workbench` from its GIT repository.
-
-```shell script
-$ pip install --upgrade git+https://github.com/informatics-isi-edu/deriva-workbench
-```
+The `deriva-workbench` is included in the `deriva-client` and `deriva-client-bundle`.
+* **MacOS and Windows users**: install the [deriva-client-bundle](https://github.com/informatics-isi-edu/deriva-client-bundle). (_Recommended for most users_)
+* **Developers and Linux users**: install the [deriva-client](https://github.com/informatics-isi-edu/deriva-client).
 
 ## Usage
 
-Start the application from the command-line.
+Start the deriva-workbench from its <img src="https://github.com/informatics-isi-edu/deriva-workbench/blob/main/deriva/workbench/icons/workbench.png" width="15" height="15"> application icon, if you installed the `deriva-client-bundle`.
+
+Start the application from the command-line, if you installed the `deriva-client`.
 
 ```shell script
 $ deriva-workbench
