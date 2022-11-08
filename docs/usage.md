@@ -3,9 +3,6 @@
 The DERIVA-Workbench is a desktop application with a graphical user interface for
 browsing and updating DERIVA catalog annotations.
 
-At this time, the DERIVA-Workbench is in an early phase of development and provided
-as a **development preview** only.
-
 ### 1. Initial Setup
 
 The first time you launch `deriva-workbench`, the application will ask you if you 
