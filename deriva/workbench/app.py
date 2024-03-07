@@ -36,7 +36,8 @@ class WorkbenchApp(BaseCLI):
         self.parser.add_argument("--no-persistence", action="store_true", help="Disable cookie and local storage persistence for QtWebEngine.")
         self.parser.add_argument("--catalog", type=str, help="Catalog identifier")
         args = self.parse_cli()
-        config_file = args.config_file or os.path.expanduser('~') + '/.deriva/workbench.json'
+        config_file = (args.config_file or
+                       os.path.expanduser('~') + os.path.sep + '.deriva' + os.path.sep + 'workbench.json')
 
         QApplication.setDesktopSettingsAware(False)
         QApplication.setStyle(QStyleFactory.create("Fusion"))

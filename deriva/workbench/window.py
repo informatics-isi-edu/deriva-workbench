@@ -123,17 +123,17 @@ class WorkbenchWindow(QMainWindow):
         if self.config.get('debug', False):
             logging.getLogger().setLevel(logging.DEBUG)
 
-        # setup connection
-        self.connection["server"] = DerivaServer(self.connection.get('protocol', 'https'),
-                                                 self.connection['host'],
-                                                 credentials=get_credential(self.connection['host']))
-
         # revise the window title to indicate host name
         self.setWindowTitle("%s (%s)" % (self.ui.title, self.connection["host"]))
 
         # auth window and get the session
         self.getNewAuthWindow()
-        self.getSession()
+        credential = self.auth_window.ui.authWidget.credential if self.auth_window.authenticated() else None
+
+        # setup connection
+        self.connection["server"] = DerivaServer(self.connection.get('protocol', 'https'),
+                                                 self.connection['host'],
+                                                 credentials=credential)
 
     def checkValidServer(self):
         """Check for valid server connection properties.
@@ -156,8 +156,7 @@ class WorkbenchWindow(QMainWindow):
         if self.auth_window:
             if self.auth_window.authenticated():
                 self.on_actionLogout_triggered()
-            self.auth_window.destroy()
-            del self.auth_window
+            self.auth_window.deleteLater()
 
         self.auth_window = \
             EmbeddedAuthWindow(self,
@@ -193,15 +192,15 @@ class WorkbenchWindow(QMainWindow):
         has_apply = hasattr(self.ui.browser.lastItemSelected, 'apply')
         has_annotations = hasattr(self.ui.browser.lastItemSelected, 'annotations')
         # ...enable actions
-        self.ui.actionUpdate.setEnabled(has_apply and self.identity is not None)
+        self.ui.actionUpdate.setEnabled(has_apply and self.auth_window.authenticated(False))
         self.ui.actionRefresh.setEnabled(self.connection.get("catalog") is not None)
         self.ui.actionValidate.setEnabled(has_annotations)
         self.ui.actionDumpAnnotations.setEnabled(has_annotations)
         self.ui.actionRestoreAnnotations.setEnabled(has_annotations)
         self.ui.actionCancel.setEnabled(False)
         self.ui.actionOptions.setEnabled(True)
-        self.ui.actionLogin.setEnabled(self.identity is None)
-        self.ui.actionLogout.setEnabled(self.identity is not None)
+        self.ui.actionLogin.setEnabled(not self.auth_window.authenticated(False))
+        self.ui.actionLogout.setEnabled(self.auth_window.authenticated(False))
         self.ui.actionExit.setEnabled(True)
 
     def disableControls(self, allow_cancel=False):
@@ -275,7 +274,7 @@ class WorkbenchWindow(QMainWindow):
             self.identity = result["client"]["id"]
             display_name = result["client"]["full_name"]
             self.setWindowTitle("%s (%s - %s)" % (self.ui.title, self.connection["host"], display_name))
-            self.updateStatus("Logged in.")
+            self.updateStatus("Logged in to host: %s" % self.connection["host"])
             self.connection["catalog"] = self._connect_ermrest(self.connection["server"], self.connection["catalog_id"])
             self.enableControls()
             self.fetchCatalogModel()
@@ -559,6 +558,8 @@ class WorkbenchWindow(QMainWindow):
                 self.getNewAuthWindow()
             else:
                 return
+        if self.auth_window.authenticated():
+            return
         self.auth_window.show()
         self.auth_window.login()
 
@@ -590,7 +591,7 @@ class WorkbenchWindow(QMainWindow):
                 write_config(config_file=self.config_file, config=self.config)
 
             # ...update debug logging
-            debug = dialog.config.get('default', False)
+            debug = dialog.config.get('debug', False)
             logging.getLogger().setLevel(logging.DEBUG if debug else logging.INFO)
 
             # ...update selected connection
@@ -599,11 +600,7 @@ class WorkbenchWindow(QMainWindow):
                 if not self.connection or any(self.connection.get(key) != selected.get(key) for key in ['host', 'catalog_id']):
                     # case: new (host, catalog) combination... establish connection
                     self.updateStatus('Connecting to "%s" (catalog: %s).' % (selected['host'], str(selected['catalog_id'])))
-                    # initialize connection and deriva server
                     self.connection = selected.copy()
-                    self.connection["server"] = DerivaServer(self.connection.get('protocol', 'https'),
-                                                             self.connection['host'],
-                                                             credentials=get_credential(self.connection['host']))
 
                     # clear out any schema editor state
                     self.ui.browser.clear()
@@ -616,7 +613,13 @@ class WorkbenchWindow(QMainWindow):
                         return
                     self.setWindowTitle("%s (%s)" % (self.ui.title, self.connection["host"]))
                     self.getNewAuthWindow()
-                    self.getSession()
+
+                    # initialize connection and deriva server
+                    credential = self.auth_window.ui.authWidget.credential if self.auth_window.authenticated() else None
+                    self.connection["credential"] = credential
+                    self.connection["server"] = DerivaServer(self.connection.get('protocol', 'https'),
+                                                             self.connection['host'],
+                                                             credentials=self.connection["credential"])
                 else:
                     # case: same (host, catalog_id)... still need to update the rest of the connection options
                     assert isinstance(self.connection, dict), "Invalid internal connection object"
@@ -637,7 +640,7 @@ class WorkbenchWindow(QMainWindow):
         qApp.closeAllWindows()
 
     def logoutConfirmation(self):
-        if self.auth_window and (not self.auth_window.authenticated() or not self.auth_window.cookie_persistence):
+        if self.auth_window and (not self.auth_window.authenticated(False) or not self.auth_window.cookie_persistence):
             return
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Warning)
