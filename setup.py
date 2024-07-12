@@ -45,15 +45,8 @@ setup(
         ]
     },
     install_requires=[
-        'deriva>=1.5.0',
-        'deriva-qt>=1.5.0'
+        'deriva-qt>=1.7'
     ],
-    extras_require={
-        'PyQt5': ["PyQt5==5.11.3"],
-        'PyQtWebEngine': ["PyQtWebEngine>=5.15.4"],
-        'PyQt5-stubs': ["PyQt5-stubs<5.12"],
-        'PyQtWebEngine-stubs': ["PyQt5-stubs>=5.15"]
-    },
     license='GNU GPL 3.0',
     classifiers=[
         'Intended Audience :: Science/Research',
