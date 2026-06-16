@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def _safe_model_name(name: str) -> str:
     """Returns a 'safe' model name for use in file system paths.
     """
-    return re.sub('\W', '_', name)
+    return re.sub(r'\W', '_', name)
 
 
 def _dirname_for_model_object(model_obj, root: str):
@@ -162,11 +162,11 @@ def dump_annotations(model_obj, root: str) -> None:
 
     # ...dump annotations
     with open(dirname + os.sep + __annotations_json__, 'w') as fp:
-        json.dump(model_obj.annotations, fp, indent=2)
+        json.dump(model_obj.annotations, fp, indent=2, sort_keys=True)
 
     # ...dump metadata
     with open(dirname + os.sep + __meta_json__, 'w') as fp:
-        json.dump(meta, fp, indent=2)
+        json.dump(meta, fp, indent=2, sort_keys=True)
 
 
 #
